@@ -245,6 +245,7 @@ public class StreamThreadTest {
                 .processId(processId)
                 .clientId(clientId)
                 .threadIdx(threadIdx)
+                .closeWaitTime(Duration.ofMillis(500L))
                 .build();
     }
 

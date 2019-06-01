@@ -126,6 +126,7 @@ import static org.apache.kafka.streams.internals.ApiUtils.prepareMillisCheckFail
 public class KafkaStreams implements AutoCloseable {
 
     private static final String JMX_PREFIX = "kafka.streams";
+    private static final Duration CLOSE_WAIT_DEFAULT = Duration.ofMillis(500);
 
     // processId is expected to be unique across JVMs and to be used
     // in userData of the subscription request to allow assignor be aware
@@ -142,6 +143,7 @@ public class KafkaStreams implements AutoCloseable {
     private final ScheduledExecutorService stateDirCleaner;
     private final QueryableStoreProvider queryableStoreProvider;
     private final AdminClient adminClient;
+    private final Duration closeWaitTime;
 
     private GlobalStreamThread globalStreamThread;
     private KafkaStreams.StateListener stateListener;
@@ -541,7 +543,7 @@ public class KafkaStreams implements AutoCloseable {
      */
     public KafkaStreams(final Topology topology,
                         final Properties props) {
-        this(topology.internalTopologyBuilder, new StreamsConfig(props), new DefaultKafkaClientSupplier());
+        this(topology.internalTopologyBuilder, new StreamsConfig(props), new DefaultKafkaClientSupplier(), Time.SYSTEM, CLOSE_WAIT_DEFAULT);
     }
 
     /**
@@ -559,7 +561,7 @@ public class KafkaStreams implements AutoCloseable {
     public KafkaStreams(final Topology topology,
                         final Properties props,
                         final KafkaClientSupplier clientSupplier) {
-        this(topology.internalTopologyBuilder, new StreamsConfig(props), clientSupplier, Time.SYSTEM);
+        this(topology.internalTopologyBuilder, new StreamsConfig(props), clientSupplier, Time.SYSTEM, CLOSE_WAIT_DEFAULT);
     }
 
     /**
@@ -576,7 +578,7 @@ public class KafkaStreams implements AutoCloseable {
     public KafkaStreams(final Topology topology,
                         final Properties props,
                         final Time time) {
-        this(topology.internalTopologyBuilder, new StreamsConfig(props), new DefaultKafkaClientSupplier(), time);
+        this(topology.internalTopologyBuilder, new StreamsConfig(props), new DefaultKafkaClientSupplier(), time, CLOSE_WAIT_DEFAULT);
     }
 
     /**
@@ -596,7 +598,85 @@ public class KafkaStreams implements AutoCloseable {
                         final Properties props,
                         final KafkaClientSupplier clientSupplier,
                         final Time time) {
-        this(topology.internalTopologyBuilder, new StreamsConfig(props), clientSupplier, time);
+        this(topology.internalTopologyBuilder, new StreamsConfig(props), clientSupplier, time, CLOSE_WAIT_DEFAULT);
+    }
+
+    /**
+     * Create a {@code KafkaStreams} instance.
+     * <p>
+     * Note: even if you never call {@link #start()} on a {@code KafkaStreams} instance,
+     * you still must {@link #close()} it to avoid resource leaks.
+     *
+     * @param topology      the topology specifying the computational logic
+     * @param props         properties for {@link StreamsConfig}
+     * @param closeWaitTime waiting time for closing internal clients
+     * @throws StreamsException if any fatal error occurs
+     */
+    public KafkaStreams(final Topology topology,
+                        final Properties props,
+                        final Duration closeWaitTime) {
+        this(topology.internalTopologyBuilder, new StreamsConfig(props), new DefaultKafkaClientSupplier(), Time.SYSTEM, closeWaitTime);
+    }
+
+    /**
+     * Create a {@code KafkaStreams} instance.
+     * <p>
+     * Note: even if you never call {@link #start()} on a {@code KafkaStreams} instance,
+     * you still must {@link #close()} it to avoid resource leaks.
+     *
+     * @param topology       the topology specifying the computational logic
+     * @param props          properties for {@link StreamsConfig}
+     * @param clientSupplier the Kafka clients supplier which provides underlying producer and consumer clients
+     *                       for the new {@code KafkaStreams} instance
+     * @param closeWaitTime  waiting time for closing internal clients
+     * @throws StreamsException if any fatal error occurs
+     */
+    public KafkaStreams(final Topology topology,
+                        final Properties props,
+                        final KafkaClientSupplier clientSupplier,
+                        final Duration closeWaitTime) {
+        this(topology.internalTopologyBuilder, new StreamsConfig(props), clientSupplier, Time.SYSTEM, closeWaitTime);
+    }
+
+    /**
+     * Create a {@code KafkaStreams} instance.
+     * <p>
+     * Note: even if you never call {@link #start()} on a {@code KafkaStreams} instance,
+     * you still must {@link #close()} it to avoid resource leaks.
+     *
+     * @param topology      the topology specifying the computational logic
+     * @param props         properties for {@link StreamsConfig}
+     * @param time          {@code Time} implementation; cannot be null
+     * @param closeWaitTime waiting time for closing internal clients
+     * @throws StreamsException if any fatal error occurs
+     */
+    public KafkaStreams(final Topology topology,
+                        final Properties props,
+                        final Time time,
+                        final Duration closeWaitTime) {
+        this(topology.internalTopologyBuilder, new StreamsConfig(props), new DefaultKafkaClientSupplier(), time, closeWaitTime);
+    }
+
+    /**
+     * Create a {@code KafkaStreams} instance.
+     * <p>
+     * Note: even if you never call {@link #start()} on a {@code KafkaStreams} instance,
+     * you still must {@link #close()} it to avoid resource leaks.
+     *
+     * @param topology       the topology specifying the computational logic
+     * @param props          properties for {@link StreamsConfig}
+     * @param clientSupplier the Kafka clients supplier which provides underlying producer and consumer clients
+     *                       for the new {@code KafkaStreams} instance
+     * @param time           {@code Time} implementation; cannot be null
+     * @param closeWaitTime waiting time for closing internal clients
+     * @throws StreamsException if any fatal error occurs
+     */
+    public KafkaStreams(final Topology topology,
+                        final Properties props,
+                        final KafkaClientSupplier clientSupplier,
+                        final Time time,
+                        final Duration closeWaitTime) {
+        this(topology.internalTopologyBuilder, new StreamsConfig(props), clientSupplier, time, closeWaitTime);
     }
 
     /**
@@ -605,7 +685,7 @@ public class KafkaStreams implements AutoCloseable {
     @Deprecated
     public KafkaStreams(final Topology topology,
                         final StreamsConfig config) {
-        this(topology, config, new DefaultKafkaClientSupplier());
+        this(topology.internalTopologyBuilder, config, new DefaultKafkaClientSupplier(), Time.SYSTEM, CLOSE_WAIT_DEFAULT);
     }
 
     /**
@@ -615,7 +695,7 @@ public class KafkaStreams implements AutoCloseable {
     public KafkaStreams(final Topology topology,
                         final StreamsConfig config,
                         final KafkaClientSupplier clientSupplier) {
-        this(topology.internalTopologyBuilder, config, clientSupplier);
+        this(topology.internalTopologyBuilder, config, clientSupplier, Time.SYSTEM, CLOSE_WAIT_DEFAULT);
     }
 
     /**
@@ -625,21 +705,17 @@ public class KafkaStreams implements AutoCloseable {
     public KafkaStreams(final Topology topology,
                         final StreamsConfig config,
                         final Time time) {
-        this(topology.internalTopologyBuilder, config, new DefaultKafkaClientSupplier(), time);
-    }
-
-    private KafkaStreams(final InternalTopologyBuilder internalTopologyBuilder,
-                         final StreamsConfig config,
-                         final KafkaClientSupplier clientSupplier) throws StreamsException {
-        this(internalTopologyBuilder, config, clientSupplier, Time.SYSTEM);
+        this(topology.internalTopologyBuilder, config, new DefaultKafkaClientSupplier(), time, CLOSE_WAIT_DEFAULT);
     }
 
     private KafkaStreams(final InternalTopologyBuilder internalTopologyBuilder,
                          final StreamsConfig config,
                          final KafkaClientSupplier clientSupplier,
-                         final Time time) throws StreamsException {
+                         final Time time,
+                         final Duration closeWaitTime) throws StreamsException {
         this.config = config;
         this.time = time;
+        this.closeWaitTime = closeWaitTime;
 
         // The application ID is a required config and hence should always have value
         final UUID processId = UUID.randomUUID();
@@ -725,6 +801,7 @@ public class KafkaStreams implements AutoCloseable {
                     .userStateRestoreListener(delegatingStateRestoreListener)
                     .processId(processId)
                     .clientId(clientId)
+                    .closeWaitTime(closeWaitTime)
                     .threadIdx(i + 1)
                     .build();
             threadState.put(threads[i].getId(), threads[i].state());
@@ -883,7 +960,7 @@ public class KafkaStreams implements AutoCloseable {
                     globalStreamThread = null;
                 }
 
-                adminClient.close();
+                adminClient.close(this.closeWaitTime);
 
                 metrics.close();
                 setState(State.NOT_RUNNING);

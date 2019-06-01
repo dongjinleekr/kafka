@@ -51,6 +51,7 @@ import org.apache.kafka.streams.state.internals.ThreadCache;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -152,7 +153,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
                       final ThreadCache cache,
                       final Time time,
                       final ProducerSupplier producerSupplier) {
-        this(id, partitions, topology, consumer, changelogReader, config, metrics, stateDirectory, cache, time, producerSupplier, null);
+        this(id, partitions, topology, consumer, changelogReader, config, metrics, stateDirectory, cache, time, producerSupplier, null, Duration.ofMillis(500L));
     }
 
     public StreamTask(final TaskId id,
@@ -166,7 +167,8 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
                       final ThreadCache cache,
                       final Time time,
                       final ProducerSupplier producerSupplier,
-                      final RecordCollector recordCollector) {
+                      final RecordCollector recordCollector,
+                      final Duration closeWaitTime) {
         super(id, partitions, topology, consumer, changelogReader, false, stateDirectory, config);
 
         this.time = time;
@@ -183,7 +185,8 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
                 id.toString(),
                 logContext,
                 productionExceptionHandler,
-                ThreadMetrics.skipRecordSensor(streamsMetrics));
+                ThreadMetrics.skipRecordSensor(streamsMetrics),
+                closeWaitTime);
         } else {
             this.recordCollector = recordCollector;
         }

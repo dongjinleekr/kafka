@@ -396,6 +396,7 @@ public class StreamThread extends Thread {
         private final String threadClientId;
         private final Producer<byte[], byte[]> threadProducer;
         private final Sensor createTaskSensor;
+        private final Duration closeWaitTime;
 
         TaskCreator(final InternalTopologyBuilder builder,
                     final StreamsConfig config,
@@ -407,7 +408,8 @@ public class StreamThread extends Thread {
                     final KafkaClientSupplier clientSupplier,
                     final Producer<byte[], byte[]> threadProducer,
                     final String threadClientId,
-                    final Logger log) {
+                    final Logger log,
+                    final Duration closeWaitTime) {
             super(
                 builder,
                 config,
@@ -420,7 +422,8 @@ public class StreamThread extends Thread {
             this.clientSupplier = clientSupplier;
             this.threadProducer = threadProducer;
             this.threadClientId = threadClientId;
-            createTaskSensor = ThreadMetrics.createTaskSensor(streamsMetrics);
+            this.createTaskSensor = ThreadMetrics.createTaskSensor(streamsMetrics);
+            this.closeWaitTime = closeWaitTime;
         }
 
         @Override
@@ -440,7 +443,9 @@ public class StreamThread extends Thread {
                 stateDirectory,
                 cache,
                 time,
-                () -> createProducer(taskId));
+                () -> createProducer(taskId),
+                null,
+                closeWaitTime);
         }
 
         private Producer<byte[], byte[]> createProducer(final TaskId id) {
@@ -459,7 +464,7 @@ public class StreamThread extends Thread {
         public void close() {
             if (threadProducer != null) {
                 try {
-                    threadProducer.close();
+                    threadProducer.close(closeWaitTime);
                 } catch (final Throwable e) {
                     log.error("Failed to close producer due to the following error:", e);
                 }
@@ -568,6 +573,7 @@ public class StreamThread extends Thread {
         private long cacheSizeBytes;
         private StateDirectory stateDirectory;
         private StateRestoreListener userStateRestoreListener;
+        private Duration closeWaitTime;
         private int threadIdx = -1;
 
         Builder(final InternalTopologyBuilder builder, final StreamsConfig config, final Time time) {
@@ -618,6 +624,11 @@ public class StreamThread extends Thread {
 
         public Builder userStateRestoreListener(final StateRestoreListener userStateRestoreListener) {
             this.userStateRestoreListener = userStateRestoreListener;
+            return this;
+        }
+
+        public Builder closeWaitTime(final Duration closeWaitTime) {
+            this.closeWaitTime = closeWaitTime;
             return this;
         }
 
@@ -680,7 +691,8 @@ public class StreamThread extends Thread {
                     clientSupplier,
                     threadProducer,
                     threadClientId,
-                    log);
+                    log,
+                    closeWaitTime);
             final AbstractTaskCreator<StandbyTask> standbyTaskCreator = new StandbyTaskCreator(
                     builder,
                     config,
