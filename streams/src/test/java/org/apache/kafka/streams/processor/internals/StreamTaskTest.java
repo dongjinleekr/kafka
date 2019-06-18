@@ -245,8 +245,7 @@ public class StreamTaskTest {
                     public void initTransactions() {
                         throw new TimeoutException("test");
                     }
-                },
-                null
+                }
             );
             fail("Expected an exception");
         } catch (final StreamsException expected) {
@@ -299,8 +298,7 @@ public class StreamTaskTest {
                         super.initTransactions();
                     }
                 }
-            },
-            null
+            }
         );
         testTask.initializeTopology();
         testTask.suspend();
@@ -849,7 +847,8 @@ public class StreamTaskTest {
                 public void flush() {
                     flushed.set(true);
                 }
-            });
+            },
+            Duration.ofMillis(500L));
         streamTask.flushState();
         assertTrue(flushed.get());
     }

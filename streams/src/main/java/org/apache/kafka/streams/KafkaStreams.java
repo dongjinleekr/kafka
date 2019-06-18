@@ -142,6 +142,7 @@ public class KafkaStreams implements AutoCloseable {
     private final ScheduledExecutorService stateDirCleaner;
     private final QueryableStoreProvider queryableStoreProvider;
     private final AdminClient adminClient;
+    private final Duration closeWaitTime;
 
     private GlobalStreamThread globalStreamThread;
     private KafkaStreams.StateListener stateListener;
@@ -640,6 +641,7 @@ public class KafkaStreams implements AutoCloseable {
                          final Time time) throws StreamsException {
         this.config = config;
         this.time = time;
+        this.closeWaitTime = Duration.ofMillis(config.getLong(StreamsConfig.CLOSE_WAIT_MS_CONFIG));
 
         // The application ID is a required config and hence should always have value
         final UUID processId = UUID.randomUUID();
@@ -726,6 +728,7 @@ public class KafkaStreams implements AutoCloseable {
                     .processId(processId)
                     .clientId(clientId)
                     .threadIdx(i + 1)
+                    .closeWaitTime(closeWaitTime)
                     .build();
             threadState.put(threads[i].getId(), threads[i].state());
             storeProviders.add(new StreamThreadStateStoreProvider(threads[i]));
@@ -883,7 +886,7 @@ public class KafkaStreams implements AutoCloseable {
                     globalStreamThread = null;
                 }
 
-                adminClient.close();
+                adminClient.close(closeWaitTime);
 
                 metrics.close();
                 setState(State.NOT_RUNNING);
