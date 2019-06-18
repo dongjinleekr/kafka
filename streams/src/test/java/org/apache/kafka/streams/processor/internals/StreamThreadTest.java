@@ -234,20 +234,18 @@ public class StreamThreadTest {
 
         clientSupplier.setClusterForAdminClient(createCluster());
 
-        return StreamThread.create(
-            internalTopologyBuilder,
-            config,
-            clientSupplier,
-            clientSupplier.getAdminClient(config.getAdminConfigs(clientId)),
-            processId,
-            clientId,
-            metrics,
-            mockTime,
-            streamsMetadataState,
-            0,
-            stateDirectory,
-            new MockStateRestoreListener(),
-            threadIdx);
+        return StreamThread.builder(internalTopologyBuilder, config, mockTime)
+                .clientSupplier(clientSupplier)
+                .adminClient(clientSupplier.getAdminClient(config.getAdminConfigs(clientId)))
+                .metrics(metrics)
+                .streamsMetadataState(streamsMetadataState)
+                .cacheSizeBytes(0)
+                .stateDirectory(stateDirectory)
+                .userStateRestoreListener(new MockStateRestoreListener())
+                .processId(processId)
+                .clientId(clientId)
+                .threadIdx(threadIdx)
+                .build();
     }
 
     @Test

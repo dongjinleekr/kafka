@@ -715,19 +715,18 @@ public class KafkaStreams implements AutoCloseable {
         final Map<Long, StreamThread.State> threadState = new HashMap<>(threads.length);
         final ArrayList<StateStoreProvider> storeProviders = new ArrayList<>();
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = StreamThread.create(internalTopologyBuilder,
-                                             config,
-                                             clientSupplier,
-                                             adminClient,
-                                             processId,
-                                             clientId,
-                                             metrics,
-                                             time,
-                                             streamsMetadataState,
-                                             cacheSizePerThread,
-                                             stateDirectory,
-                                             delegatingStateRestoreListener,
-                                             i + 1);
+            threads[i] = StreamThread.builder(internalTopologyBuilder, config, time)
+                    .clientSupplier(clientSupplier)
+                    .adminClient(adminClient)
+                    .metrics(metrics)
+                    .streamsMetadataState(streamsMetadataState)
+                    .cacheSizeBytes(cacheSizePerThread)
+                    .stateDirectory(stateDirectory)
+                    .userStateRestoreListener(delegatingStateRestoreListener)
+                    .processId(processId)
+                    .clientId(clientId)
+                    .threadIdx(i + 1)
+                    .build();
             threadState.put(threads[i].getId(), threads[i].state());
             storeProviders.add(new StreamThreadStateStoreProvider(threads[i]));
         }

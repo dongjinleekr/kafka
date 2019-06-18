@@ -57,6 +57,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -551,104 +552,192 @@ public class StreamThread extends Thread {
     final Consumer<byte[], byte[]> consumer;
     final InternalTopologyBuilder builder;
 
-    public static StreamThread create(final InternalTopologyBuilder builder,
-                                      final StreamsConfig config,
-                                      final KafkaClientSupplier clientSupplier,
-                                      final AdminClient adminClient,
-                                      final UUID processId,
-                                      final String clientId,
-                                      final Metrics metrics,
-                                      final Time time,
-                                      final StreamsMetadataState streamsMetadataState,
-                                      final long cacheSizeBytes,
-                                      final StateDirectory stateDirectory,
-                                      final StateRestoreListener userStateRestoreListener,
-                                      final int threadIdx) {
-        final String threadClientId = clientId + "-StreamThread-" + threadIdx;
+    public static class Builder {
+        // directly given to the StreamThread constructor.
+        private InternalTopologyBuilder builder;
+        private StreamsConfig config;
+        private Time time;
 
-        final String logPrefix = String.format("stream-thread [%s] ", threadClientId);
-        final LogContext logContext = new LogContext(logPrefix);
-        final Logger log = logContext.logger(StreamThread.class);
+        // used to instantiate other parameters to StreamThread constructor.
+        private KafkaClientSupplier clientSupplier;
+        private AdminClient adminClient;
+        private UUID processId;
+        private String clientId;
+        private Metrics metrics;
+        private StreamsMetadataState streamsMetadataState;
+        private long cacheSizeBytes;
+        private StateDirectory stateDirectory;
+        private StateRestoreListener userStateRestoreListener;
+        private int threadIdx = -1;
 
-        log.info("Creating restore consumer client");
-        final Map<String, Object> restoreConsumerConfigs = config.getRestoreConsumerConfigs(getRestoreConsumerClientId(threadClientId));
-        final Consumer<byte[], byte[]> restoreConsumer = clientSupplier.getRestoreConsumer(restoreConsumerConfigs);
-        final Duration pollTime = Duration.ofMillis(config.getLong(StreamsConfig.POLL_MS_CONFIG));
-        final StoreChangelogReader changelogReader = new StoreChangelogReader(restoreConsumer, pollTime, userStateRestoreListener, logContext);
-
-        Producer<byte[], byte[]> threadProducer = null;
-        final boolean eosEnabled = StreamsConfig.EXACTLY_ONCE.equals(config.getString(StreamsConfig.PROCESSING_GUARANTEE_CONFIG));
-        if (!eosEnabled) {
-            final Map<String, Object> producerConfigs = config.getProducerConfigs(getThreadProducerClientId(threadClientId));
-            log.info("Creating shared producer client");
-            threadProducer = clientSupplier.getProducer(producerConfigs);
+        Builder(final InternalTopologyBuilder builder, final StreamsConfig config, final Time time) {
+            this.builder = Objects.requireNonNull(builder, "builder can't be null");
+            this.config = Objects.requireNonNull(config, "config can't be null");
+            this.time = Objects.requireNonNull(time, "time can't be null");
         }
 
-        final StreamsMetricsImpl streamsMetrics = new StreamsMetricsImpl(metrics, threadClientId);
-
-        final ThreadCache cache = new ThreadCache(logContext, cacheSizeBytes, streamsMetrics);
-
-        final AbstractTaskCreator<StreamTask> activeTaskCreator = new TaskCreator(
-            builder,
-            config,
-            streamsMetrics,
-            stateDirectory,
-            changelogReader,
-            cache,
-            time,
-            clientSupplier,
-            threadProducer,
-            threadClientId,
-            log);
-        final AbstractTaskCreator<StandbyTask> standbyTaskCreator = new StandbyTaskCreator(
-            builder,
-            config,
-            streamsMetrics,
-            stateDirectory,
-            changelogReader,
-            time,
-            log);
-        final TaskManager taskManager = new TaskManager(
-            changelogReader,
-            processId,
-            logPrefix,
-            restoreConsumer,
-            streamsMetadataState,
-            activeTaskCreator,
-            standbyTaskCreator,
-            adminClient,
-            new AssignedStreamsTasks(logContext),
-            new AssignedStandbyTasks(logContext));
-
-        log.info("Creating consumer client");
-        final String applicationId = config.getString(StreamsConfig.APPLICATION_ID_CONFIG);
-        final Map<String, Object> consumerConfigs = config.getMainConsumerConfigs(applicationId, getConsumerClientId(threadClientId), threadIdx);
-        consumerConfigs.put(StreamsConfig.InternalConfig.TASK_MANAGER_FOR_PARTITION_ASSIGNOR, taskManager);
-        final AtomicInteger assignmentErrorCode = new AtomicInteger();
-        consumerConfigs.put(StreamsConfig.InternalConfig.ASSIGNMENT_ERROR_CODE, assignmentErrorCode);
-        String originalReset = null;
-        if (!builder.latestResetTopicsPattern().pattern().equals("") || !builder.earliestResetTopicsPattern().pattern().equals("")) {
-            originalReset = (String) consumerConfigs.get(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
-            consumerConfigs.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "none");
+        public Builder clientSupplier(final KafkaClientSupplier clientSupplier) {
+            this.clientSupplier = clientSupplier;
+            return this;
         }
 
-        final Consumer<byte[], byte[]> consumer = clientSupplier.getConsumer(consumerConfigs);
-        taskManager.setConsumer(consumer);
+        public Builder adminClient(final AdminClient adminClient) {
+            this.adminClient = adminClient;
+            return this;
+        }
 
-        return new StreamThread(
-            time,
-            config,
-            threadProducer,
-            restoreConsumer,
-            consumer,
-            originalReset,
-            taskManager,
-            streamsMetrics,
-            builder,
-            threadClientId,
-            logContext,
-            assignmentErrorCode)
-            .updateThreadMetadata(getSharedAdminClientId(clientId));
+        public Builder processId(final UUID processId) {
+            this.processId = processId;
+            return this;
+        }
+
+        public Builder clientId(final String clientId) {
+            this.clientId = clientId;
+            return this;
+        }
+
+        public Builder metrics(final Metrics metrics) {
+            this.metrics = metrics;
+            return this;
+        }
+
+        public Builder streamsMetadataState(final StreamsMetadataState streamsMetadataState) {
+            this.streamsMetadataState = streamsMetadataState;
+            return this;
+        }
+
+        public Builder cacheSizeBytes(final long cacheSizeBytes) {
+            this.cacheSizeBytes = cacheSizeBytes;
+            return this;
+        }
+
+        public Builder stateDirectory(final StateDirectory stateDirectory) {
+            this.stateDirectory = stateDirectory;
+            return this;
+        }
+
+        public Builder userStateRestoreListener(final StateRestoreListener userStateRestoreListener) {
+            this.userStateRestoreListener = userStateRestoreListener;
+            return this;
+        }
+
+        public Builder threadIdx(final int threadIdx) {
+            this.threadIdx = threadIdx;
+            return this;
+        }
+
+        public StreamThread build() {
+            // parameter validation
+            Objects.requireNonNull(clientSupplier, "clientSupplier can't be null");
+            Objects.requireNonNull(adminClient, "adminClient can't be null");
+            Objects.requireNonNull(processId, "processId can't be null");
+            if (clientId == null || clientId.isEmpty()) {
+                throw new IllegalArgumentException("clientId can't be null or empty");
+            }
+            Objects.requireNonNull(metrics, "metrics can't be null");
+            Objects.requireNonNull(streamsMetadataState, "streamsMetadataState can't be null");
+            if (cacheSizeBytes < 0L) {
+                throw new IllegalArgumentException("cacheSizeBytes can't be negative: " + cacheSizeBytes);
+            }
+            Objects.requireNonNull(stateDirectory, "stateDirectory can't be null");
+            Objects.requireNonNull(userStateRestoreListener, "userStateRestoreListener can't be null");
+            if (threadIdx <= 0) {
+                throw new IllegalArgumentException("threadIdx can't be non-positive: " + threadIdx);
+            }
+
+            final String threadClientId = clientId + "-StreamThread-" + threadIdx;
+
+            final String logPrefix = String.format("stream-thread [%s] ", threadClientId);
+            final LogContext logContext = new LogContext(logPrefix);
+            final Logger log = logContext.logger(StreamThread.class);
+
+            log.info("Creating restore consumer client");
+            final Map<String, Object> restoreConsumerConfigs = config.getRestoreConsumerConfigs(getRestoreConsumerClientId(threadClientId));
+            final Consumer<byte[], byte[]> restoreConsumer = clientSupplier.getRestoreConsumer(restoreConsumerConfigs);
+            final Duration pollTime = Duration.ofMillis(config.getLong(StreamsConfig.POLL_MS_CONFIG));
+            final StoreChangelogReader changelogReader = new StoreChangelogReader(restoreConsumer, pollTime, userStateRestoreListener, logContext);
+
+            Producer<byte[], byte[]> threadProducer = null;
+            final boolean eosEnabled = StreamsConfig.EXACTLY_ONCE.equals(config.getString(StreamsConfig.PROCESSING_GUARANTEE_CONFIG));
+            if (!eosEnabled) {
+                final Map<String, Object> producerConfigs = config.getProducerConfigs(getThreadProducerClientId(threadClientId));
+                log.info("Creating shared producer client");
+                threadProducer = clientSupplier.getProducer(producerConfigs);
+            }
+
+            final StreamsMetricsImpl streamsMetrics = new StreamsMetricsImpl(metrics, threadClientId);
+
+            final ThreadCache cache = new ThreadCache(logContext, cacheSizeBytes, streamsMetrics);
+
+            final AbstractTaskCreator<StreamTask> activeTaskCreator = new TaskCreator(
+                    builder,
+                    config,
+                    streamsMetrics,
+                    stateDirectory,
+                    changelogReader,
+                    cache,
+                    time,
+                    clientSupplier,
+                    threadProducer,
+                    threadClientId,
+                    log);
+            final AbstractTaskCreator<StandbyTask> standbyTaskCreator = new StandbyTaskCreator(
+                    builder,
+                    config,
+                    streamsMetrics,
+                    stateDirectory,
+                    changelogReader,
+                    time,
+                    log);
+            final TaskManager taskManager = new TaskManager(
+                    changelogReader,
+                    processId,
+                    logPrefix,
+                    restoreConsumer,
+                    streamsMetadataState,
+                    activeTaskCreator,
+                    standbyTaskCreator,
+                    adminClient,
+                    new AssignedStreamsTasks(logContext),
+                    new AssignedStandbyTasks(logContext));
+
+            log.info("Creating consumer client");
+            final String applicationId = config.getString(StreamsConfig.APPLICATION_ID_CONFIG);
+            final Map<String, Object> consumerConfigs = config.getMainConsumerConfigs(applicationId, getConsumerClientId(threadClientId), threadIdx);
+            consumerConfigs.put(StreamsConfig.InternalConfig.TASK_MANAGER_FOR_PARTITION_ASSIGNOR, taskManager);
+            final AtomicInteger assignmentErrorCode = new AtomicInteger();
+            consumerConfigs.put(StreamsConfig.InternalConfig.ASSIGNMENT_ERROR_CODE, assignmentErrorCode);
+            String originalReset = null;
+            if (!builder.latestResetTopicsPattern().pattern().equals("") || !builder.earliestResetTopicsPattern().pattern().equals("")) {
+                originalReset = (String) consumerConfigs.get(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
+                consumerConfigs.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "none");
+            }
+
+            final Consumer<byte[], byte[]> consumer = clientSupplier.getConsumer(consumerConfigs);
+            taskManager.setConsumer(consumer);
+
+            return new StreamThread(
+                    time,
+                    config,
+                    threadProducer,
+                    restoreConsumer,
+                    consumer,
+                    originalReset,
+                    taskManager,
+                    streamsMetrics,
+                    builder,
+                    threadClientId,
+                    logContext,
+                    assignmentErrorCode)
+                    .updateThreadMetadata(getSharedAdminClientId(clientId));
+        }
+    }
+
+    /**
+     * Returns a new builder.
+     */
+    public static Builder builder(final InternalTopologyBuilder builder, final StreamsConfig config, final Time time) {
+        return new Builder(builder, config, time);
     }
 
     public StreamThread(final Time time,
