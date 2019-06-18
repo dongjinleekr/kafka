@@ -267,7 +267,7 @@ public class RecordCollectorImpl implements RecordCollector {
     public void close() {
         log.debug("Closing producer");
         if (producer != null) {
-            producer.close();
+            producer.close(StreamThread.PRODUCER_CLOSE_TIMEOUT);
             producer = null;
         }
         checkForException();

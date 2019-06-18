@@ -126,6 +126,7 @@ import static org.apache.kafka.streams.internals.ApiUtils.prepareMillisCheckFail
 public class KafkaStreams implements AutoCloseable {
 
     private static final String JMX_PREFIX = "kafka.streams";
+    private static final Duration ADMIN_CLIENT_CLOSE_TIMEOUT = Duration.ofMillis(500L);
 
     // processId is expected to be unique across JVMs and to be used
     // in userData of the subscription request to allow assignor be aware
@@ -884,7 +885,7 @@ public class KafkaStreams implements AutoCloseable {
                     globalStreamThread = null;
                 }
 
-                adminClient.close();
+                adminClient.close(ADMIN_CLIENT_CLOSE_TIMEOUT);
 
                 metrics.close();
                 setState(State.NOT_RUNNING);

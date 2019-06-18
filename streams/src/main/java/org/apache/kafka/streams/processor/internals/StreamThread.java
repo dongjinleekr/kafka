@@ -458,7 +458,7 @@ public class StreamThread extends Thread {
         public void close() {
             if (threadProducer != null) {
                 try {
-                    threadProducer.close();
+                    threadProducer.close(PRODUCER_CLOSE_TIMEOUT);
                 } catch (final Throwable e) {
                     log.error("Failed to close producer due to the following error:", e);
                 }
@@ -515,6 +515,8 @@ public class StreamThread extends Thread {
             }
         }
     }
+
+    static final Duration PRODUCER_CLOSE_TIMEOUT = Duration.ofMillis(500L);
 
     private final Time time;
     private final Logger log;
