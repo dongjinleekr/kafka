@@ -1066,6 +1066,52 @@ public class ConfigDef {
         }
     }
 
+    public static class CompressionLevelValidator implements Validator {
+
+        @Override
+        public void ensureValid(String name, Object value) {
+            String s = (String) value;
+
+            if (!s.isEmpty()) {
+                try {
+                    Integer.parseInt(s);
+                } catch (NumberFormatException e) {
+                    throw new ConfigException(name, value, "String must have an integer value");
+                }
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "empty or integer valued string";
+        }
+    }
+
+    public static class CompressionBufferSizeValidator implements Validator {
+
+        @Override
+        public void ensureValid(String name, Object value) {
+            String s = (String) value;
+
+            if (!s.isEmpty()) {
+                try {
+                    int i = Integer.parseInt(s);
+
+                    if (i < 0) {
+                        throw new ConfigException(name, value, "String must have a positive integer value");
+                    }
+                } catch (NumberFormatException e) {
+                    throw new ConfigException(name, value, "String must have an integer value");
+                }
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "empty or positive integer valued string";
+        }
+    }
+
     public static class ConfigKey {
         public final String name;
         public final Type type;

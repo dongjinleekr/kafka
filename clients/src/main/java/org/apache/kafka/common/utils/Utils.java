@@ -612,6 +612,19 @@ public final class Utils {
     }
 
     /**
+     * Converts a string into Integer. If given str is null or empty, it returns null; else, it returns `Integer.valueOf(str)`.
+     *
+     * @throws NumberFormatException    If the String does not contain a parsable integer.
+     */
+    public static Integer nullableInteger(String str) {
+        if (str == null || str.isEmpty()) {
+            return null;
+        } else {
+            return Integer.valueOf(str);
+        }
+    }
+
+    /**
      * Read a buffer into a Byte array for the given offset and length
      */
     public static byte[] readBytes(ByteBuffer buffer, int offset, int length) {
