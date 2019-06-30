@@ -876,7 +876,7 @@ class AbstractFetcherThreadTest {
         logStartOffset = state.logStartOffset,
         recordConversionStats = RecordConversionStats.EMPTY,
         sourceType = CompressionType.NONE,
-        targetType = CompressionType.NONE,
+        targetConfig = CompressionConfig.none(),
         shallowCount = batches.size,
         validBytes = partitionData.records.sizeInBytes,
         offsetsMonotonic = true,

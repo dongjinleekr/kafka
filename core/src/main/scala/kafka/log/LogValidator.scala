@@ -354,7 +354,7 @@ private[kafka] object LogValidator extends Logging {
         val first = records.batches.asScala.head
         (first.producerId, first.producerEpoch, first.baseSequence, first.isTransactional)
       }
-      buildRecordsAndAssignOffsets(toMagic, offsetCounter, time, timestampType, targetConfig.getType, now,
+      buildRecordsAndAssignOffsets(toMagic, offsetCounter, time, timestampType, targetConfig, now,
         validatedRecords, producerId, producerEpoch, sequence, isTransactional, partitionLeaderEpoch, isFromClient,
         uncompressedSizeInBytes)
     } else {
@@ -387,7 +387,7 @@ private[kafka] object LogValidator extends Logging {
                                            offsetCounter: LongRef,
                                            time: Time,
                                            timestampType: TimestampType,
-                                           compressionType: CompressionType,
+                                           compressionConfig: CompressionConfig,
                                            logAppendTime: Long,
                                            validatedRecords: Seq[Record],
                                            producerId: Long,
@@ -398,12 +398,12 @@ private[kafka] object LogValidator extends Logging {
                                            isFromClient: Boolean,
                                            uncompressedSizeInBytes: Int): ValidationAndOffsetAssignResult = {
     val startNanos = time.nanoseconds
-    val estimatedSize = AbstractRecords.estimateSizeInBytes(magic, offsetCounter.value, compressionType,
+    val estimatedSize = AbstractRecords.estimateSizeInBytes(magic, offsetCounter.value, compressionConfig.getType,
       validatedRecords.asJava)
     val buffer = ByteBuffer.allocate(estimatedSize)
     val builder = MemoryRecords.builder(buffer)
         .magic(magic)
-        .compressionType(compressionType)
+        .compressionConfig(compressionConfig)
         .timestampType(timestampType)
         .baseOffset(offsetCounter.value)
         .logAppendTime(logAppendTime)

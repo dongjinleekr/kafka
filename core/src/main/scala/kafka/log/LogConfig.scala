@@ -30,7 +30,7 @@ import org.apache.kafka.common.record.{LegacyRecord, TimestampType}
 import org.apache.kafka.common.utils.Utils
 
 import scala.collection.{Map, mutable}
-import org.apache.kafka.common.config.ConfigDef.{ConfigKey, ValidList, Validator}
+import org.apache.kafka.common.config.ConfigDef.{CompressionBufferSizeValidator, CompressionLevelValidator, ConfigKey, ValidList, Validator}
 
 object Defaults {
   val SegmentSize = kafka.server.Defaults.LogSegmentBytes
@@ -57,6 +57,8 @@ object Defaults {
   val UncleanLeaderElectionEnable = kafka.server.Defaults.UncleanLeaderElectionEnable
   val MinInSyncReplicas = kafka.server.Defaults.MinInSyncReplicas
   val CompressionType = kafka.server.Defaults.CompressionType
+  val CompressionLevel = kafka.server.Defaults.CompressionLevel
+  val CompressionBufferSize = kafka.server.Defaults.CompressionBufferSize
   val PreAllocateEnable = kafka.server.Defaults.LogPreAllocateEnable
   val MessageFormatVersion = kafka.server.Defaults.LogMessageFormatVersion
   val MessageTimestampType = kafka.server.Defaults.LogMessageTimestampType
@@ -108,6 +110,22 @@ case class LogConfig(props: java.util.Map[_, _], overriddenConfigs: Set[String] 
     if (compact && maxCompactionLagMs > 0) math.min(maxCompactionLagMs, segmentMs)
     else segmentMs
   }
+
+  def compressionLevel: Integer = {
+    if (getString(LogConfig.CompressionLevelProp).isEmpty) {
+      null
+    } else {
+      Integer.valueOf(getString(LogConfig.CompressionLevelProp))
+    }
+  }
+
+  def compressionBufferSize: Integer = {
+    if (getString(LogConfig.CompressionBufferSizeProp).isEmpty) {
+      null
+    } else {
+      Integer.valueOf(getString(LogConfig.CompressionBufferSizeProp))
+    }
+  }
 }
 
 object LogConfig {
@@ -137,6 +155,8 @@ object LogConfig {
   val UncleanLeaderElectionEnableProp = TopicConfig.UNCLEAN_LEADER_ELECTION_ENABLE_CONFIG
   val MinInSyncReplicasProp = TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG
   val CompressionTypeProp = TopicConfig.COMPRESSION_TYPE_CONFIG
+  val CompressionLevelProp = TopicConfig.COMPRESSION_LEVEL_CONFIG
+  val CompressionBufferSizeProp = TopicConfig.COMPRESSION_BUFFER_SIZE_CONFIG
   val PreAllocateEnableProp = TopicConfig.PREALLOCATE_CONFIG
   val MessageFormatVersionProp = TopicConfig.MESSAGE_FORMAT_VERSION_CONFIG
   val MessageTimestampTypeProp = TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG
@@ -166,6 +186,8 @@ object LogConfig {
   val UncleanLeaderElectionEnableDoc = TopicConfig.UNCLEAN_LEADER_ELECTION_ENABLE_DOC
   val MinInSyncReplicasDoc = TopicConfig.MIN_IN_SYNC_REPLICAS_DOC
   val CompressionTypeDoc = TopicConfig.COMPRESSION_TYPE_DOC
+  val CompressionLevelDoc = TopicConfig.COMPRESSION_LEVEL_DOC
+  val CompressionBufferSizeDoc = TopicConfig.COMPRESSION_BUFFER_SIZE_DOC
   val PreAllocateEnableDoc = TopicConfig.PREALLOCATE_DOC
   val MessageFormatVersionDoc = TopicConfig.MESSAGE_FORMAT_VERSION_DOC
   val MessageTimestampTypeDoc = TopicConfig.MESSAGE_TIMESTAMP_TYPE_DOC
@@ -265,6 +287,10 @@ object LogConfig {
         KafkaConfig.MinInSyncReplicasProp)
       .define(CompressionTypeProp, STRING, Defaults.CompressionType, in(BrokerCompressionCodec.brokerCompressionOptions:_*),
         MEDIUM, CompressionTypeDoc, KafkaConfig.CompressionTypeProp)
+      .define(CompressionLevelProp, STRING, Defaults.CompressionLevel, new ConfigDef.CompressionLevelValidator, MEDIUM, CompressionLevelDoc,
+        KafkaConfig.CompressionLevelProp)
+      .define(CompressionBufferSizeProp, STRING, Defaults.CompressionBufferSize, new ConfigDef.CompressionBufferSizeValidator, MEDIUM, CompressionBufferSizeDoc,
+        KafkaConfig.CompressionBufferSizeProp)
       .define(PreAllocateEnableProp, BOOLEAN, Defaults.PreAllocateEnable, MEDIUM, PreAllocateEnableDoc,
         KafkaConfig.LogPreAllocateProp)
       .define(MessageFormatVersionProp, STRING, Defaults.MessageFormatVersion, ApiVersionValidator, MEDIUM, MessageFormatVersionDoc,
@@ -352,6 +378,8 @@ object LogConfig {
     UncleanLeaderElectionEnableProp -> KafkaConfig.UncleanLeaderElectionEnableProp,
     MinInSyncReplicasProp -> KafkaConfig.MinInSyncReplicasProp,
     CompressionTypeProp -> KafkaConfig.CompressionTypeProp,
+    CompressionLevelProp -> KafkaConfig.CompressionLevelProp,
+    CompressionBufferSizeProp -> KafkaConfig.CompressionBufferSizeProp,
     PreAllocateEnableProp -> KafkaConfig.LogPreAllocateProp,
     MessageFormatVersionProp -> KafkaConfig.LogMessageFormatVersionProp,
     MessageTimestampTypeProp -> KafkaConfig.LogMessageTimestampTypeProp,
