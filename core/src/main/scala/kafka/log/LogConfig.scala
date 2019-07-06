@@ -57,6 +57,7 @@ object Defaults {
   val UncleanLeaderElectionEnable = kafka.server.Defaults.UncleanLeaderElectionEnable
   val MinInSyncReplicas = kafka.server.Defaults.MinInSyncReplicas
   val CompressionType = kafka.server.Defaults.CompressionType
+  val CompressionConfig = kafka.server.Defaults.CompressionConfig
   val PreAllocateEnable = kafka.server.Defaults.LogPreAllocateEnable
   val MessageFormatVersion = kafka.server.Defaults.LogMessageFormatVersion
   val MessageTimestampType = kafka.server.Defaults.LogMessageTimestampType
@@ -93,6 +94,8 @@ case class LogConfig(props: java.util.Map[_, _], overriddenConfigs: Set[String] 
   val uncleanLeaderElectionEnable = getBoolean(LogConfig.UncleanLeaderElectionEnableProp)
   val minInSyncReplicas = getInt(LogConfig.MinInSyncReplicasProp)
   val compressionType = getString(LogConfig.CompressionTypeProp).toLowerCase(Locale.ROOT)
+  val compressionConfig = getString(LogConfig.CompressionConfigProp)
+
   val preallocate = getBoolean(LogConfig.PreAllocateEnableProp)
   val messageFormatVersion = ApiVersion(getString(LogConfig.MessageFormatVersionProp))
   val messageTimestampType = TimestampType.forName(getString(LogConfig.MessageTimestampTypeProp))
@@ -137,6 +140,7 @@ object LogConfig {
   val UncleanLeaderElectionEnableProp = TopicConfig.UNCLEAN_LEADER_ELECTION_ENABLE_CONFIG
   val MinInSyncReplicasProp = TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG
   val CompressionTypeProp = TopicConfig.COMPRESSION_TYPE_CONFIG
+  val CompressionConfigProp = TopicConfig.COMPRESSION_CONFIG_CONFIG
   val PreAllocateEnableProp = TopicConfig.PREALLOCATE_CONFIG
   val MessageFormatVersionProp = TopicConfig.MESSAGE_FORMAT_VERSION_CONFIG
   val MessageTimestampTypeProp = TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG
@@ -166,6 +170,7 @@ object LogConfig {
   val UncleanLeaderElectionEnableDoc = TopicConfig.UNCLEAN_LEADER_ELECTION_ENABLE_DOC
   val MinInSyncReplicasDoc = TopicConfig.MIN_IN_SYNC_REPLICAS_DOC
   val CompressionTypeDoc = TopicConfig.COMPRESSION_TYPE_DOC
+  val CompressionConfigDoc = TopicConfig.COMPRESSION_CONFIG_DOC
   val PreAllocateEnableDoc = TopicConfig.PREALLOCATE_DOC
   val MessageFormatVersionDoc = TopicConfig.MESSAGE_FORMAT_VERSION_DOC
   val MessageTimestampTypeDoc = TopicConfig.MESSAGE_TIMESTAMP_TYPE_DOC
@@ -265,6 +270,7 @@ object LogConfig {
         KafkaConfig.MinInSyncReplicasProp)
       .define(CompressionTypeProp, STRING, Defaults.CompressionType, in(BrokerCompressionCodec.brokerCompressionOptions:_*),
         MEDIUM, CompressionTypeDoc, KafkaConfig.CompressionTypeProp)
+      .define(CompressionConfigProp, STRING, Defaults.CompressionConfig, MEDIUM, CompressionConfigDoc, KafkaConfig.CompressionConfigProp)
       .define(PreAllocateEnableProp, BOOLEAN, Defaults.PreAllocateEnable, MEDIUM, PreAllocateEnableDoc,
         KafkaConfig.LogPreAllocateProp)
       .define(MessageFormatVersionProp, STRING, Defaults.MessageFormatVersion, ApiVersionValidator, MEDIUM, MessageFormatVersionDoc,
@@ -352,6 +358,7 @@ object LogConfig {
     UncleanLeaderElectionEnableProp -> KafkaConfig.UncleanLeaderElectionEnableProp,
     MinInSyncReplicasProp -> KafkaConfig.MinInSyncReplicasProp,
     CompressionTypeProp -> KafkaConfig.CompressionTypeProp,
+    CompressionConfigProp -> KafkaConfig.CompressionConfigProp,
     PreAllocateEnableProp -> KafkaConfig.LogPreAllocateProp,
     MessageFormatVersionProp -> KafkaConfig.LogMessageFormatVersionProp,
     MessageTimestampTypeProp -> KafkaConfig.LogMessageTimestampTypeProp,

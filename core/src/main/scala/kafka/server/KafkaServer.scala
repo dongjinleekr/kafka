@@ -76,6 +76,7 @@ object KafkaServer {
     logProps.put(LogConfig.CleanupPolicyProp, kafkaConfig.logCleanupPolicy)
     logProps.put(LogConfig.MinInSyncReplicasProp, kafkaConfig.minInSyncReplicas)
     logProps.put(LogConfig.CompressionTypeProp, kafkaConfig.compressionType)
+    logProps.put(LogConfig.CompressionConfigProp, kafkaConfig.compressionConfig)
     logProps.put(LogConfig.UncleanLeaderElectionEnableProp, kafkaConfig.uncleanLeaderElectionEnable)
     logProps.put(LogConfig.PreAllocateEnableProp, kafkaConfig.logPreAllocateEnable)
     logProps.put(LogConfig.MessageFormatVersionProp, kafkaConfig.logMessageFormatVersion.version)

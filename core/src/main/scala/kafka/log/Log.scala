@@ -50,11 +50,11 @@ import scala.collection.{Seq, Set, mutable}
 
 object LogAppendInfo {
   val UnknownLogAppendInfo = LogAppendInfo(None, -1, RecordBatch.NO_TIMESTAMP, -1L, RecordBatch.NO_TIMESTAMP, -1L,
-    RecordConversionStats.EMPTY, CompressionType.NONE, CompressionType.NONE, -1, -1, offsetsMonotonic = false, -1L)
+    RecordConversionStats.EMPTY, CompressionType.NONE, CompressionConfig.none(), -1, -1, offsetsMonotonic = false, -1L)
 
   def unknownLogAppendInfoWithLogStartOffset(logStartOffset: Long): LogAppendInfo =
     LogAppendInfo(None, -1, RecordBatch.NO_TIMESTAMP, -1L, RecordBatch.NO_TIMESTAMP, logStartOffset,
-      RecordConversionStats.EMPTY, CompressionType.NONE, CompressionType.NONE, -1, -1, offsetsMonotonic = false, -1L)
+      RecordConversionStats.EMPTY, CompressionType.NONE, CompressionConfig.none(), -1, -1, offsetsMonotonic = false, -1L)
 }
 
 /**
@@ -69,7 +69,7 @@ object LogAppendInfo {
  * @param logStartOffset The start offset of the log at the time of this append.
  * @param recordConversionStats Statistics collected during record processing, `null` if `assignOffsets` is `false`
  * @param sourceType The source compression type used in the message set (send by the producer)
- * @param targetType The target compression type of the message set(after applying the broker compression configuration if any)
+ * @param targetConfig The target compression config of the message set(after applying the broker compression configuration if any)
  * @param shallowCount The number of shallow messages
  * @param validBytes The number of valid bytes
  * @param offsetsMonotonic Are the offsets in this message set monotonically increasing
@@ -83,7 +83,7 @@ case class LogAppendInfo(var firstOffset: Option[Long],
                          var logStartOffset: Long,
                          var recordConversionStats: RecordConversionStats,
                          sourceType: CompressionType,
-                         targetType: CompressionType,
+                         targetConfig: CompressionConfig,
                          shallowCount: Int,
                          validBytes: Int,
                          offsetsMonotonic: Boolean,
@@ -933,7 +933,7 @@ class Log(@volatile var dir: File,
               time,
               now,
               appendInfo.sourceType,
-              CompressionConfig.of(appendInfo.targetType),
+              appendInfo.targetConfig,
               config.compact,
               config.messageFormatVersion.recordVersion.value,
               config.messageTimestampType,
@@ -1243,8 +1243,10 @@ class Log(@volatile var dir: File,
 
     // Apply broker-side compression if any
     val targetType = BrokerCompressionCodec.getTargetCompressionType(config.compressionType, sourceType)
+    val compressionConfigMap = CompressionConfig.from(config.compressionConfig)
+    val targetConfig = compressionConfigMap.get(targetType)
     LogAppendInfo(firstOffset, lastOffset, maxTimestamp, offsetOfMaxTimestamp, RecordBatch.NO_TIMESTAMP, logStartOffset,
-      RecordConversionStats.EMPTY, sourceType, targetType, shallowMessageCount, validBytesCount, monotonic, lastOffsetOfFirstBatch)
+      RecordConversionStats.EMPTY, sourceType, targetConfig, shallowMessageCount, validBytesCount, monotonic, lastOffsetOfFirstBatch)
   }
 
   private def updateProducers(batch: RecordBatch,

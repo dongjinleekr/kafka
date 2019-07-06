@@ -152,6 +152,13 @@ public class TopicConfig {
         "accepts 'uncompressed' which is equivalent to no compression; and 'producer' which means retain the " +
         "original compression codec set by the producer.";
 
+    public static final String COMPRESSION_CONFIG_CONFIG = "compression.config";
+    public static final String COMPRESSION_CONFIG_DOC =
+        "A Comma-separated list of compression configuration keys and values. Available keys and values are: \n" +
+        "gzip.level: 1~9 (default: 6), gzip.buffer.size: positive integer (default: 8192=8kb), snappy.buffer.size: positive integer (default: 32768=32kb), " +
+        "lz4.level: 1~17 (default: 9), lz4.buffer.size: 4~7 (4=64kb (default), 5=256kb, 6=1mb, 7=4mb), zstd.level: -131072~22 (default: 3).\n" +
+        "Example: gzip.level:4,gzip.buffer.size:4096,snappy.buffer.size:16384,lz4.level:11,lz4.buffer.size:7,zstd.level:-42";
+
     public static final String PREALLOCATE_CONFIG = "preallocate";
     public static final String PREALLOCATE_DOC = "True if we should preallocate the file on disk when " +
         "creating a new log segment.";
