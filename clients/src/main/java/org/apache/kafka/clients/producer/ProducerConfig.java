@@ -166,6 +166,13 @@ public class ProducerConfig extends AbstractConfig {
                                                        + " values are <code>none</code>, <code>gzip</code>, <code>snappy</code>, <code>lz4</code>, or <code>zstd</code>. "
                                                        + "Compression is of full batches of data, so the efficacy of batching will also impact the compression ratio (more batching means better compression).";
 
+    /** <code>compression.config</code> */
+    public static final String COMPRESSION_CONFIG_CONFIG = "compression.config";
+    private static final String COMPRESSION_CONFIG_DOC = "A Comma-separated list of compression configuration keys and values. Available keys and values are: \n" +
+            "gzip.level: 1~9 (default: 6), gzip.buffer.size: positive integer (default: 8192=8kb), snappy.buffer.size: positive integer (default: 32768=32kb), " +
+            "lz4.level: 1~17 (default: 9), lz4.buffer.size: 4~7 (4=64kb (default), 5=256kb, 6=1mb, 7=4mb), zstd.level: -131072~22 (default: 3).\n" +
+            "Example: gzip.level:4,gzip.buffer.size:4096,snappy.buffer.size:16384,lz4.level:11,lz4.buffer.size:7,zstd.level:-42";
+
     /** <code>metrics.sample.window.ms</code> */
     public static final String METRICS_SAMPLE_WINDOW_MS_CONFIG = CommonClientConfigs.METRICS_SAMPLE_WINDOW_MS_CONFIG;
 
@@ -259,6 +266,7 @@ public class ProducerConfig extends AbstractConfig {
                                         Importance.HIGH,
                                         ACKS_DOC)
                                 .define(COMPRESSION_TYPE_CONFIG, Type.STRING, "none", Importance.HIGH, COMPRESSION_TYPE_DOC)
+                                .define(COMPRESSION_CONFIG_CONFIG, Type.STRING, "", Importance.MEDIUM, COMPRESSION_CONFIG_DOC)
                                 .define(BATCH_SIZE_CONFIG, Type.INT, 16384, atLeast(0), Importance.MEDIUM, BATCH_SIZE_DOC)
                                 .define(LINGER_MS_CONFIG, Type.LONG, 0, atLeast(0), Importance.MEDIUM, LINGER_MS_DOC)
                                 .define(DELIVERY_TIMEOUT_MS_CONFIG, Type.INT, 120 * 1000, atLeast(0), Importance.MEDIUM, DELIVERY_TIMEOUT_MS_DOC)

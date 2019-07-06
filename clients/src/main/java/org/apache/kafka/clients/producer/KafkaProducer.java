@@ -246,7 +246,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private final RecordAccumulator accumulator;
     private final Sender sender;
     private final Thread ioThread;
-    private final CompressionType compressionType;
+    private final CompressionConfig compressionConfig;
     private final Sensor errors;
     private final Time time;
     private final Serializer<K> keySerializer;
@@ -387,7 +387,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                     valueSerializer, interceptorList, reporters);
             this.maxRequestSize = config.getInt(ProducerConfig.MAX_REQUEST_SIZE_CONFIG);
             this.totalMemorySize = config.getLong(ProducerConfig.BUFFER_MEMORY_CONFIG);
-            this.compressionType = CompressionType.forName(config.getString(ProducerConfig.COMPRESSION_TYPE_CONFIG));
+            CompressionType compressionType = CompressionType.forName(config.getString(ProducerConfig.COMPRESSION_TYPE_CONFIG));
+            Map<CompressionType, CompressionConfig> compressionConfigs = CompressionConfig.from(config.getString(ProducerConfig.COMPRESSION_CONFIG_CONFIG));
+            this.compressionConfig = compressionConfigs.get(compressionType);
 
             this.maxBlockTimeMs = config.getLong(ProducerConfig.MAX_BLOCK_MS_CONFIG);
             this.transactionManager = configureTransactionState(config, logContext, log);
@@ -396,7 +398,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             this.apiVersions = new ApiVersions();
             this.accumulator = new RecordAccumulator(logContext,
                     config.getInt(ProducerConfig.BATCH_SIZE_CONFIG),
-                    CompressionConfig.of(this.compressionType),
+                    compressionConfig,
                     lingerMs(config),
                     retryBackoffMs,
                     deliveryTimeoutMs,
@@ -905,7 +907,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             Header[] headers = record.headers().toArray();
 
             int serializedSize = AbstractRecords.estimateSizeInBytesUpperBound(apiVersions.maxUsableProduceMagic(),
-                    compressionType, serializedKey, serializedValue, headers);
+                    compressionConfig.getType(), serializedKey, serializedValue, headers);
             ensureValidRecordSize(serializedSize);
             long timestamp = record.timestamp() == null ? time.milliseconds() : record.timestamp();
             log.trace("Sending record {} with callback {} to topic {} partition {}", record, callback, record.topic(), partition);
