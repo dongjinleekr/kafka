@@ -693,6 +693,8 @@ class KafkaConfigTest {
         case KafkaConfig.NumQuotaSamplesProp => assertPropertyInvalid(getBaseProperties(), name, "not_a_number", "0")
         case KafkaConfig.QuotaWindowSizeSecondsProp => assertPropertyInvalid(getBaseProperties(), name, "not_a_number", "0")
         case KafkaConfig.DeleteTopicEnableProp => assertPropertyInvalid(getBaseProperties(), name, "not_a_boolean", "0")
+        case KafkaConfig.CompressionTypeProp => // ignore string
+        case KafkaConfig.CompressionConfigProp => // ignore string
 
         case KafkaConfig.MetricNumSamplesProp => assertPropertyInvalid(getBaseProperties, name, "not_a_number", "-1", "0")
         case KafkaConfig.MetricSampleWindowMsProp => assertPropertyInvalid(getBaseProperties, name, "not_a_number", "-1", "0")
@@ -783,6 +785,7 @@ class KafkaConfigTest {
     defaults.put(KafkaConfig.OffsetsTopicCompressionCodecProp, SnappyCompressionCodec.codec.toString)
     // For MetricRecordingLevelProp
     defaults.put(KafkaConfig.MetricRecordingLevelProp, Sensor.RecordingLevel.DEBUG.toString)
+    defaults.put(KafkaConfig.CompressionConfigProp, "gzip.level:4,gzip.buffer.size:4096")
 
     val config = KafkaConfig.fromProps(defaults)
     assertEquals("127.0.0.1:2181", config.zkConnect)
@@ -805,6 +808,7 @@ class KafkaConfigTest {
     assertEquals(7 * 24 * 60L * 60L * 1000L, config.delegationTokenMaxLifeMs)
     assertEquals(24 * 60L * 60L * 1000L, config.delegationTokenExpiryTimeMs)
     assertEquals(1 * 60L * 1000L * 60, config.delegationTokenExpiryCheckIntervalMs)
+    assertEquals("gzip.level:4,gzip.buffer.size:4096", config.compressionConfig)
 
     defaults.put(KafkaConfig.DelegationTokenMasterKeyProp, "1234567890")
     val config1 = KafkaConfig.fromProps(defaults)

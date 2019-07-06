@@ -198,6 +198,7 @@ object Defaults {
   val DeleteTopicEnable = true
 
   val CompressionType = "producer"
+  val CompressionConfig = ""
 
   val MaxIdMapSnapshots = 2
   /** ********* Kafka Metrics Configuration ***********/
@@ -417,6 +418,7 @@ object KafkaConfig {
 
   val DeleteTopicEnableProp = "delete.topic.enable"
   val CompressionTypeProp = "compression.type"
+  val CompressionConfigProp = "compression.config"
 
   /** ********* Kafka Metrics Configuration ***********/
   val MetricSampleWindowMsProp = CommonClientConfigs.METRICS_SAMPLE_WINDOW_MS_CONFIG
@@ -763,6 +765,10 @@ object KafkaConfig {
   val CompressionTypeDoc = "Specify the final compression type for a given topic. This configuration accepts the standard compression codecs " +
   "('gzip', 'snappy', 'lz4', 'zstd'). It additionally accepts 'uncompressed' which is equivalent to no compression; and " +
   "'producer' which means retain the original compression codec set by the producer."
+  val CompressionConfigDoc = "A Comma-separated list of compression configuration keys and values. Available keys and values are: \n" +
+    "gzip.level: 1~9 (default: 6), gzip.buffer.size: positive integer (default: 8192=8kb), snappy.buffer.size: positive integer (default: 32768=32kb), " +
+    "lz4.level: 1~17 (default: 9), lz4.buffer.size: 4~7 (4=64kb (default), 5=256kb, 6=1mb, 7=4mb), zstd.level: -131072~22 (default: 3).\n" +
+    "Example: gzip.level:4,gzip.buffer.size:4096,snappy.buffer.size:16384,lz4.level:11,lz4.buffer.size:7,zstd.level:-42"
 
   /** ********* Kafka Metrics Configuration ***********/
   val MetricSampleWindowMsDoc = CommonClientConfigs.METRICS_SAMPLE_WINDOW_MS_DOC
@@ -991,6 +997,7 @@ object KafkaConfig {
       .define(OffsetCommitRequiredAcksProp, SHORT, Defaults.OffsetCommitRequiredAcks, HIGH, OffsetCommitRequiredAcksDoc)
       .define(DeleteTopicEnableProp, BOOLEAN, Defaults.DeleteTopicEnable, HIGH, DeleteTopicEnableDoc)
       .define(CompressionTypeProp, STRING, Defaults.CompressionType, HIGH, CompressionTypeDoc)
+      .define(CompressionConfigProp, STRING, Defaults.CompressionConfig, MEDIUM, CompressionConfigDoc)
 
       /** ********* Transaction management configuration ***********/
       .define(TransactionalIdExpirationMsProp, INT, Defaults.TransactionalIdExpirationMs, atLeast(1), HIGH, TransactionalIdExpirationMsDoc)
@@ -1345,6 +1352,7 @@ class KafkaConfig(val props: java.util.Map[_, _], doLog: Boolean, dynamicConfigO
 
   val deleteTopicEnable = getBoolean(KafkaConfig.DeleteTopicEnableProp)
   def compressionType = getString(KafkaConfig.CompressionTypeProp)
+  val compressionConfig = getString(KafkaConfig.CompressionConfigProp)
 
   def addReconfigurable(reconfigurable: Reconfigurable): Unit = {
     dynamicConfig.addReconfigurable(reconfigurable)
