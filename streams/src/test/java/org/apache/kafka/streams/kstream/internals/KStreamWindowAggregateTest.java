@@ -34,10 +34,10 @@ import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.TimeWindows;
 import org.apache.kafka.streams.kstream.Windowed;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.state.WindowStore;
 import org.apache.kafka.streams.TestInputTopic;
 import org.apache.kafka.streams.test.TestRecord;
+import org.apache.kafka.test.LogCaptureContext;
 import org.apache.kafka.test.MockAggregator;
 import org.apache.kafka.test.MockInitializer;
 import org.apache.kafka.test.MockProcessor;
@@ -64,6 +64,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class KStreamWindowAggregateTest {
+
     private final Properties props = StreamsTestUtils.getStreamsConfig(Serdes.String(), Serdes.String());
     private final String threadId = Thread.currentThread().getName();
 
@@ -275,35 +276,39 @@ public class KStreamWindowAggregateTest {
     }
 
     private void shouldLogAndMeterWhenSkippingNullKey(final String builtInMetricsVersion) {
-        final StreamsBuilder builder = new StreamsBuilder();
-        final String topic = "topic";
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldLogAndMeterWhenSkippingNullKey:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(8);
 
-        builder
-            .stream(topic, Consumed.with(Serdes.String(), Serdes.String()))
-            .groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
-            .windowedBy(TimeWindows.of(ofMillis(10)).advanceBy(ofMillis(5)))
-            .aggregate(
-                MockInitializer.STRING_INIT,
-                MockAggregator.toStringInstance("+"),
-                Materialized.<String, String, WindowStore<Bytes, byte[]>>as("topic1-Canonicalized").withValueSerde(Serdes.String())
-            );
+            final StreamsBuilder builder = new StreamsBuilder();
+            final String topic = "topic";
 
-        props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
-
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(KStreamWindowAggregate.class);
-             final TopologyTestDriver driver = new TopologyTestDriver(builder.build(), props)) {
-
-            final TestInputTopic<String, String> inputTopic =
-                driver.createInputTopic(topic, new StringSerializer(), new StringSerializer());
-            inputTopic.pipeInput(null, "1");
-
-            if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
-                assertEquals(
-                    1.0,
-                    getMetricByName(driver.metrics(), "skipped-records-total", "stream-metrics").metricValue()
+            builder
+                .stream(topic, Consumed.with(Serdes.String(), Serdes.String()))
+                .groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
+                .windowedBy(TimeWindows.of(ofMillis(10)).advanceBy(ofMillis(5)))
+                .aggregate(
+                    MockInitializer.STRING_INIT,
+                    MockAggregator.toStringInstance("+"),
+                    Materialized.<String, String, WindowStore<Bytes, byte[]>>as("topic1-Canonicalized").withValueSerde(Serdes.String())
                 );
+
+            props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
+
+            try (final TopologyTestDriver driver = new TopologyTestDriver(builder.build(), props)) {
+                final TestInputTopic<String, String> inputTopic =
+                    driver.createInputTopic(topic, new StringSerializer(), new StringSerializer());
+                inputTopic.pipeInput(null, "1");
+
+                if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
+                    assertEquals(
+                        1.0,
+                            getMetricByName(driver.metrics(), "skipped-records-total", "stream-metrics").metricValue()
+                    );
+                }
+                assertThat(logCaptureContext.getMessages(),
+                    hasItem("WARN Skipping record due to null key. value=[1] topic=[topic] partition=[0] offset=[0] "));
             }
-            assertThat(appender.getMessages(), hasItem("Skipping record due to null key. value=[1] topic=[topic] partition=[0] offset=[0]"));
         }
     }
 
@@ -319,63 +324,66 @@ public class KStreamWindowAggregateTest {
 
     @Deprecated // testing deprecated functionality (behavior of until)
     private void shouldLogAndMeterWhenSkippingExpiredWindow(final String builtInMetricsVersion) {
-        final StreamsBuilder builder = new StreamsBuilder();
-        final String topic = "topic";
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldLogAndMeterWhenSkippingExpiredWindow:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(7);
 
-        final KStream<String, String> stream1 = builder.stream(topic, Consumed.with(Serdes.String(), Serdes.String()));
-        stream1.groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
-               .windowedBy(TimeWindows.of(ofMillis(10)).advanceBy(ofMillis(5)).until(100))
-               .aggregate(
-                   () -> "",
-                   MockAggregator.toStringInstance("+"),
-                   Materialized.<String, String, WindowStore<Bytes, byte[]>>as("topic1-Canonicalized").withValueSerde(Serdes.String()).withCachingDisabled().withLoggingDisabled()
-               )
-               .toStream()
-               .map((key, value) -> new KeyValue<>(key.toString(), value))
-               .to("output");
+            final StreamsBuilder builder = new StreamsBuilder();
+            final String topic = "topic";
 
-        props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
+            final KStream<String, String> stream1 = builder.stream(topic, Consumed.with(Serdes.String(), Serdes.String()));
+            stream1.groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
+                .windowedBy(TimeWindows.of(ofMillis(10)).advanceBy(ofMillis(5)).until(100))
+                .aggregate(
+                    () -> "",
+                    MockAggregator.toStringInstance("+"),
+                    Materialized.<String, String, WindowStore<Bytes, byte[]>>as("topic1-Canonicalized").withValueSerde(Serdes.String()).withCachingDisabled().withLoggingDisabled()
+                )
+                .toStream()
+                .map((key, value) -> new KeyValue<>(key.toString(), value))
+                .to("output");
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(KStreamWindowAggregate.class);
-             final TopologyTestDriver driver = new TopologyTestDriver(builder.build(), props)) {
+            props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
 
-            final TestInputTopic<String, String> inputTopic =
+            try (final TopologyTestDriver driver = new TopologyTestDriver(builder.build(), props)) {
+                final TestInputTopic<String, String> inputTopic =
                     driver.createInputTopic(topic, new StringSerializer(), new StringSerializer());
-            inputTopic.pipeInput("k", "100", 100L);
-            inputTopic.pipeInput("k", "0", 0L);
-            inputTopic.pipeInput("k", "1", 1L);
-            inputTopic.pipeInput("k", "2", 2L);
-            inputTopic.pipeInput("k", "3", 3L);
-            inputTopic.pipeInput("k", "4", 4L);
-            inputTopic.pipeInput("k", "5", 5L);
-            inputTopic.pipeInput("k", "6", 6L);
+                inputTopic.pipeInput("k", "100", 100L);
+                inputTopic.pipeInput("k", "0", 0L);
+                inputTopic.pipeInput("k", "1", 1L);
+                inputTopic.pipeInput("k", "2", 2L);
+                inputTopic.pipeInput("k", "3", 3L);
+                inputTopic.pipeInput("k", "4", 4L);
+                inputTopic.pipeInput("k", "5", 5L);
+                inputTopic.pipeInput("k", "6", 6L);
 
-            assertLatenessMetrics(
-                driver,
-                builtInMetricsVersion,
-                is(7.0), // how many events get dropped
-                is(100.0), // k:0 is 100ms late, since its time is 0, but it arrives at stream time 100.
-                is(84.875) // (0 + 100 + 99 + 98 + 97 + 96 + 95 + 94) / 8
-            );
+                assertLatenessMetrics(
+                    driver,
+                    builtInMetricsVersion,
+                    is(7.0), // how many events get dropped
+                    is(100.0), // k:0 is 100ms late, since its time is 0, but it arrives at stream time 100.
+                    is(84.875) // (0 + 100 + 99 + 98 + 97 + 96 + 95 + 94) / 8
+                );
 
-            assertThat(appender.getMessages(), hasItems(
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[1] timestamp=[0] window=[0,10) expiration=[10] streamTime=[100]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[2] timestamp=[1] window=[0,10) expiration=[10] streamTime=[100]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[3] timestamp=[2] window=[0,10) expiration=[10] streamTime=[100]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[4] timestamp=[3] window=[0,10) expiration=[10] streamTime=[100]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[5] timestamp=[4] window=[0,10) expiration=[10] streamTime=[100]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[6] timestamp=[5] window=[0,10) expiration=[10] streamTime=[100]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[7] timestamp=[6] window=[0,10) expiration=[10] streamTime=[100]"
-            ));
+                assertThat(logCaptureContext.getMessages(), hasItems(
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[1] timestamp=[0] window=[0,10) expiration=[10] streamTime=[100] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[2] timestamp=[1] window=[0,10) expiration=[10] streamTime=[100] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[3] timestamp=[2] window=[0,10) expiration=[10] streamTime=[100] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[4] timestamp=[3] window=[0,10) expiration=[10] streamTime=[100] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[5] timestamp=[4] window=[0,10) expiration=[10] streamTime=[100] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[6] timestamp=[5] window=[0,10) expiration=[10] streamTime=[100] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[7] timestamp=[6] window=[0,10) expiration=[10] streamTime=[100] "
+                ));
 
-            final TestOutputTopic<String, String> outputTopic =
+                final TestOutputTopic<String, String> outputTopic =
                     driver.createOutputTopic("output", new StringDeserializer(), new StringDeserializer());
 
-            assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@95/105]", "+100", null, 100L)));
-            assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@100/110]", "+100", null, 100L)));
-            assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@5/15]", "+5", null, 5L)));
-            assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@5/15]", "+5+6", null, 6L)));
-            assertTrue(outputTopic.isEmpty());
+                assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@95/105]", "+100", null, 100L)));
+                assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@100/110]", "+100", null, 100L)));
+                assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@5/15]", "+5", null, 5L)));
+                assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@5/15]", "+5+6", null, 6L)));
+                assertTrue(outputTopic.isEmpty());
+            }
         }
     }
 
@@ -390,53 +398,56 @@ public class KStreamWindowAggregateTest {
     }
 
     private void shouldLogAndMeterWhenSkippingExpiredWindowByGrace(final String builtInMetricsVersion) {
-        final StreamsBuilder builder = new StreamsBuilder();
-        final String topic = "topic";
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldLogAndMeterWhenSkippingExpiredWindowByGrace:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(7);
 
-        final KStream<String, String> stream1 = builder.stream(topic, Consumed.with(Serdes.String(), Serdes.String()));
-        stream1.groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
-               .windowedBy(TimeWindows.of(ofMillis(10)).advanceBy(ofMillis(10)).grace(ofMillis(90L)))
-               .aggregate(
-                   () -> "",
-                   MockAggregator.toStringInstance("+"),
-                   Materialized.<String, String, WindowStore<Bytes, byte[]>>as("topic1-Canonicalized").withValueSerde(Serdes.String()).withCachingDisabled().withLoggingDisabled()
-               )
-               .toStream()
-               .map((key, value) -> new KeyValue<>(key.toString(), value))
-               .to("output");
+            final StreamsBuilder builder = new StreamsBuilder();
+            final String topic = "topic";
 
-        props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
+            final KStream<String, String> stream1 = builder.stream(topic, Consumed.with(Serdes.String(), Serdes.String()));
+            stream1.groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
+                .windowedBy(TimeWindows.of(ofMillis(10)).advanceBy(ofMillis(10)).grace(ofMillis(90L)))
+                .aggregate(
+                    () -> "",
+                    MockAggregator.toStringInstance("+"),
+                    Materialized.<String, String, WindowStore<Bytes, byte[]>>as("topic1-Canonicalized").withValueSerde(Serdes.String()).withCachingDisabled().withLoggingDisabled()
+                )
+                .toStream()
+                .map((key, value) -> new KeyValue<>(key.toString(), value))
+                .to("output");
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(KStreamWindowAggregate.class);
-             final TopologyTestDriver driver = new TopologyTestDriver(builder.build(), props)) {
+            props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
 
-            final TestInputTopic<String, String> inputTopic =
+            try (final TopologyTestDriver driver = new TopologyTestDriver(builder.build(), props)) {
+                final TestInputTopic<String, String> inputTopic =
                     driver.createInputTopic(topic, new StringSerializer(), new StringSerializer());
-            inputTopic.pipeInput("k", "100", 200L);
-            inputTopic.pipeInput("k", "0", 100L);
-            inputTopic.pipeInput("k", "1", 101L);
-            inputTopic.pipeInput("k", "2", 102L);
-            inputTopic.pipeInput("k", "3", 103L);
-            inputTopic.pipeInput("k", "4", 104L);
-            inputTopic.pipeInput("k", "5", 105L);
-            inputTopic.pipeInput("k", "6", 6L);
+                inputTopic.pipeInput("k", "100", 200L);
+                inputTopic.pipeInput("k", "0", 100L);
+                inputTopic.pipeInput("k", "1", 101L);
+                inputTopic.pipeInput("k", "2", 102L);
+                inputTopic.pipeInput("k", "3", 103L);
+                inputTopic.pipeInput("k", "4", 104L);
+                inputTopic.pipeInput("k", "5", 105L);
+                inputTopic.pipeInput("k", "6", 6L);
 
-            assertLatenessMetrics(driver, builtInMetricsVersion, is(7.0), is(194.0), is(97.375));
+                assertLatenessMetrics(driver, builtInMetricsVersion, is(7.0), is(194.0), is(97.375));
 
-            assertThat(appender.getMessages(), hasItems(
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[1] timestamp=[100] window=[100,110) expiration=[110] streamTime=[200]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[2] timestamp=[101] window=[100,110) expiration=[110] streamTime=[200]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[3] timestamp=[102] window=[100,110) expiration=[110] streamTime=[200]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[4] timestamp=[103] window=[100,110) expiration=[110] streamTime=[200]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[5] timestamp=[104] window=[100,110) expiration=[110] streamTime=[200]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[6] timestamp=[105] window=[100,110) expiration=[110] streamTime=[200]",
-                "Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[7] timestamp=[6] window=[0,10) expiration=[110] streamTime=[200]"
-            ));
+                assertThat(logCaptureContext.getMessages(), hasItems(
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[1] timestamp=[100] window=[100,110) expiration=[110] streamTime=[200] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[2] timestamp=[101] window=[100,110) expiration=[110] streamTime=[200] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[3] timestamp=[102] window=[100,110) expiration=[110] streamTime=[200] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[4] timestamp=[103] window=[100,110) expiration=[110] streamTime=[200] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[5] timestamp=[104] window=[100,110) expiration=[110] streamTime=[200] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[6] timestamp=[105] window=[100,110) expiration=[110] streamTime=[200] ",
+                    "WARN Skipping record for expired window. key=[k] topic=[topic] partition=[0] offset=[7] timestamp=[6] window=[0,10) expiration=[110] streamTime=[200] "
+                ));
 
-            final TestOutputTopic<String, String> outputTopic =
+                final TestOutputTopic<String, String> outputTopic =
                     driver.createOutputTopic("output", new StringDeserializer(), new StringDeserializer());
-            assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@200/210]", "+100", null, 200L)));
-            assertTrue(outputTopic.isEmpty());
+                assertThat(outputTopic.readRecord(), equalTo(new TestRecord<>("[k@200/210]", "+100", null, 200L)));
+                assertTrue(outputTopic.isEmpty());
+            }
         }
     }
 

@@ -34,9 +34,9 @@ import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.ValueMapper;
 import org.apache.kafka.streams.processor.MockProcessorContext;
 import org.apache.kafka.streams.processor.Processor;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.streams.test.TestRecord;
+import org.apache.kafka.test.LogCaptureContext;
 import org.apache.kafka.test.MockApiProcessor;
 import org.apache.kafka.test.MockApiProcessorSupplier;
 import org.apache.kafka.test.MockReducer;
@@ -64,6 +64,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class KTableKTableLeftJoinTest {
+
     private final String topic1 = "topic1";
     private final String topic2 = "topic2";
     private final String output = "output";
@@ -524,34 +525,34 @@ public class KTableKTableLeftJoinTest {
     }
 
     private void shouldLogAndMeterSkippedRecordsDueToNullLeftKey(final String builtInMetricsVersion) {
-        final StreamsBuilder builder = new StreamsBuilder();
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldLogAndMeterSkippedRecordsDueToNullLeftKey:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(1);
 
-        @SuppressWarnings("unchecked")
-        final Processor<String, Change<String>> join = new KTableKTableLeftJoin<>(
-            (KTableImpl<String, String, String>) builder.table("left", Consumed.with(Serdes.String(), Serdes.String())),
-            (KTableImpl<String, String, String>) builder.table("right", Consumed.with(Serdes.String(), Serdes.String())),
-            null
-        ).get();
+            final StreamsBuilder builder = new StreamsBuilder();
 
-        props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
-        final MockProcessorContext context = new MockProcessorContext(props);
-        context.setRecordMetadata("left", -1, -2, null, -3);
-        join.init(context);
+            @SuppressWarnings("unchecked")
+            final Processor<String, Change<String>> join = new KTableKTableLeftJoin<>(
+                (KTableImpl<String, String, String>) builder.table("left", Consumed.with(Serdes.String(), Serdes.String())),
+                (KTableImpl<String, String, String>) builder.table("right", Consumed.with(Serdes.String(), Serdes.String())),
+                null
+            ).get();
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(KTableKTableLeftJoin.class)) {
+            props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
+            final MockProcessorContext context = new MockProcessorContext(props);
+            context.setRecordMetadata("left", -1, -2, null, -3);
+            join.init(context);
+
             join.process(null, new Change<>("new", "old"));
 
-            assertThat(
-                appender.getMessages(),
-                hasItem("Skipping record due to null key. change=[(new<-old)] topic=[left] partition=[-1] offset=[-2]")
-            );
-        }
-
-        if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
-            assertEquals(
-                1.0,
-                getMetricByName(context.metrics().metrics(), "skipped-records-total", "stream-metrics").metricValue()
-            );
+            if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
+                assertEquals(
+                    1.0,
+                    getMetricByName(context.metrics().metrics(), "skipped-records-total", "stream-metrics").metricValue()
+                );
+            }
+            assertThat(logCaptureContext.getMessages(),
+                hasItem("WARN Skipping record due to null key. change=[(new<-old)] topic=[left] partition=[-1] offset=[-2] "));
         }
     }
 
