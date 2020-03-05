@@ -365,7 +365,7 @@ class StreamsSmokeTestBaseService(StreamsTestBaseService):
         args['version'] = self.KAFKA_STREAMS_VERSION
         args['kafka_run_class'] = self.path.script("kafka-run-class.sh", node)
 
-        cmd = "( export KAFKA_LOG4J_OPTS=\"-Dlog4j.configuration=file:%(log4j)s\";" \
+        cmd = "( export KAFKA_LOG4J_OPTS=\"-Dlog4j.configurationFile=file:%(log4j)s\";" \
               " INCLUDE_TEST_JARS=true UPGRADE_KAFKA_STREAMS_TEST_VERSION=%(version)s" \
               " %(kafka_run_class)s %(streams_class_name)s" \
               " %(config_file)s %(user_test_args1)s" \
