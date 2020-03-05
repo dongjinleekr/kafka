@@ -31,8 +31,8 @@ import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.ThreadMetadata;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.test.IntegrationTest;
+import org.apache.kafka.test.LogCaptureContext;
 import org.apache.kafka.test.TestUtils;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,7 +62,9 @@ import static org.apache.kafka.streams.integration.utils.IntegrationTestUtils.pu
 import static org.apache.kafka.streams.integration.utils.IntegrationTestUtils.safeUniqueTestName;
 import static org.apache.kafka.test.TestUtils.waitForCondition;
 
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -70,7 +72,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 @Category(IntegrationTest.class)
 public class AdjustStreamThreadCountTest {
@@ -369,18 +370,13 @@ public class AdjustStreamThreadCountTest {
             addStreamStateChangeListener(kafkaStreams);
             startStreamsAndWaitForRunning(kafkaStreams);
 
-            try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(KafkaStreams.class)) {
+            try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldResizeCacheAfterThreadRemovalTimesOut")) {
                 assertThrows(TimeoutException.class, () -> kafkaStreams.removeStreamThread(Duration.ofSeconds(0)));
 
-                for (final String log : appender.getMessages()) {
-                    // all 10 bytes should be available for remaining thread
-                    if (log.endsWith("Resizing thread cache due to thread removal, new cache size per thread is 10")) {
-                        return;
-                    }
-                }
+                assertThat(logCaptureContext.getMessages(), hasItem(containsString("Resizing thread cache due to thread removal, new cache size per thread is 10 ")));
             }
         }
-        fail();
     }
 
     @Test
@@ -422,20 +418,15 @@ public class AdjustStreamThreadCountTest {
             startStreamsAndWaitForRunning(kafkaStreams);
 
             stateTransitionHistory.clear();
-            try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister()) {
+            try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldResizeCacheAfterThreadReplacement")) {
                 injectError.set(true);
                 waitForCondition(() -> !injectError.get(), "StreamThread did not hit and reset the injected error");
 
                 waitForTransitionFromRebalancingToRunning();
-
-                for (final String log : appender.getMessages()) {
-                    // after we replace the thread there should be two remaining threads with 5 bytes each
-                    if (log.endsWith("Adding StreamThread-3, there will now be 2 live threads and the new cache size per thread is 5")) {
-                        return;
-                    }
-                }
+                // after we replace the thread there should be two remaining threads with 5 bytes each
+                assertThat(logCaptureContext.getMessages(), hasItem(containsString("Adding StreamThread-3, there will now be 2 live threads and the new cache size per thread is 5 ")));
             }
         }
-        fail();
     }
 }

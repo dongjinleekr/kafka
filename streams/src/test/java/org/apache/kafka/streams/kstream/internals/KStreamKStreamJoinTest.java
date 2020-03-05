@@ -33,10 +33,10 @@ import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.StreamJoined;
 import org.apache.kafka.streams.processor.internals.InternalTopicConfig;
 import org.apache.kafka.streams.processor.internals.InternalTopologyBuilder;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.TestInputTopic;
 import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.streams.state.WindowBytesStoreSupplier;
+import org.apache.kafka.test.LogCaptureContext;
 import org.apache.kafka.test.MockProcessor;
 import org.apache.kafka.test.MockProcessorSupplier;
 import org.apache.kafka.test.MockValueJoiner;
@@ -116,42 +116,45 @@ public class KStreamKStreamJoinTest {
     }
 
     private void shouldLogAndMeterOnSkippedRecordsWithNullValue(final String builtInMetricsVersion) {
-        final StreamsBuilder builder = new StreamsBuilder();
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldLogAndMeterOnSkippedRecordsWithNullValue:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(6);
 
-        final KStream<String, Integer> left = builder.stream("left", Consumed.with(Serdes.String(), Serdes.Integer()));
-        final KStream<String, Integer> right = builder.stream("right", Consumed.with(Serdes.String(), Serdes.Integer()));
+            final StreamsBuilder builder = new StreamsBuilder();
 
-        left.join(
-            right,
-            Integer::sum,
-            JoinWindows.of(ofMillis(100)),
-            StreamJoined.with(Serdes.String(), Serdes.Integer(), Serdes.Integer())
-        );
+            final KStream<String, Integer> left = builder.stream("left", Consumed.with(Serdes.String(), Serdes.Integer()));
+            final KStream<String, Integer> right = builder.stream("right", Consumed.with(Serdes.String(), Serdes.Integer()));
 
-        props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
-
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(KStreamKStreamJoin.class);
-             final TopologyTestDriver driver = new TopologyTestDriver(builder.build(), props)) {
-
-            final TestInputTopic<String, Integer> inputTopic =
-                    driver.createInputTopic("left", new StringSerializer(), new IntegerSerializer());
-            inputTopic.pipeInput("A", null);
-
-            assertThat(
-                appender.getMessages(),
-                hasItem("Skipping record due to null key or value. key=[A] value=[null] topic=[left] partition=[0] "
-                    + "offset=[0]")
+            left.join(
+                right,
+                Integer::sum,
+                JoinWindows.of(ofMillis(100)),
+                StreamJoined.with(Serdes.String(), Serdes.Integer(), Serdes.Integer())
             );
 
-            if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
-                assertEquals(
-                    1.0,
-                    getMetricByName(
-                        driver.metrics(),
-                        "skipped-records-total",
-                        "stream-metrics"
-                    ).metricValue()
+            props.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
+
+            try (final TopologyTestDriver driver = new TopologyTestDriver(builder.build(), props)) {
+                final TestInputTopic<String, Integer> inputTopic =
+                    driver.createInputTopic("left", new StringSerializer(), new IntegerSerializer());
+                inputTopic.pipeInput("A", null);
+
+                assertThat(
+                    logCaptureContext.getMessages(),
+                    hasItem("WARN Skipping record due to null key or value. key=[A] value=[null] topic=[left] partition=[0] "
+                            + "offset=[0] ")
                 );
+
+                if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
+                    assertEquals(
+                        1.0,
+                        getMetricByName(
+                            driver.metrics(),
+                            "skipped-records-total",
+                            "stream-metrics"
+                        ).metricValue()
+                    );
+                }
             }
         }
     }
@@ -288,7 +291,10 @@ public class KStreamKStreamJoinTest {
 
     @Test
     public void shouldBuildJoinWithCustomStoresAndCorrectWindowSettings() {
-        //Case where everything matches up
+        // Case where everything matches up
+        final WindowBytesStoreSupplier thisStoreSupplier = buildWindowBytesStoreSupplier("in-memory-join-store", 150, 100, true);
+        final WindowBytesStoreSupplier otherStoreSupplier = buildWindowBytesStoreSupplier("in-memory-join-store-other", 150, 100, true);
+
         final StreamsBuilder builder = new StreamsBuilder();
         final KStream<String, Integer> left = builder.stream("left", Consumed.with(Serdes.String(), Serdes.Integer()));
         final KStream<String, Integer> right = builder.stream("right", Consumed.with(Serdes.String(), Serdes.Integer()));

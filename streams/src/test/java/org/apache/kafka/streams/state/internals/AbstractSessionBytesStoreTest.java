@@ -32,9 +32,9 @@ import org.apache.kafka.streams.kstream.Windowed;
 import org.apache.kafka.streams.kstream.internals.SessionWindow;
 import org.apache.kafka.streams.processor.StateStoreContext;
 import org.apache.kafka.streams.processor.internals.MockStreamsMetrics;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.SessionStore;
+import org.apache.kafka.test.LogCaptureContext;
 import org.apache.kafka.test.InternalMockProcessorContext;
 import org.apache.kafka.test.MockRecordCollector;
 import org.apache.kafka.test.StreamsTestUtils;
@@ -49,6 +49,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 
@@ -58,8 +59,8 @@ import static org.apache.kafka.common.utils.Utils.mkMap;
 import static org.apache.kafka.test.StreamsTestUtils.toSet;
 import static org.apache.kafka.test.StreamsTestUtils.valuesToSet;
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.hasItem;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -605,20 +606,23 @@ public abstract class AbstractSessionBytesStoreTest {
     }
 
     private void shouldLogAndMeasureExpiredRecords(final String builtInMetricsVersion) {
-        final Properties streamsConfig = StreamsTestUtils.getStreamsConfig();
-        streamsConfig.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
-        final SessionStore<String, Long> sessionStore = buildSessionStore(RETENTION_PERIOD, Serdes.String(), Serdes.Long());
-        final InternalMockProcessorContext context = new InternalMockProcessorContext(
-            TestUtils.tempDirectory(),
-            new StreamsConfig(streamsConfig),
-            recordCollector
-        );
-        final Time time = new SystemTime();
-        context.setTime(1L);
-        context.setSystemTimeMs(time.milliseconds());
-        sessionStore.init((StateStoreContext) context, sessionStore);
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(
+                this.getClass().getName() + "#shouldLogAndMeasureExpiredRecords:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(2);
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister()) {
+            final Properties streamsConfig = StreamsTestUtils.getStreamsConfig();
+            streamsConfig.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
+            final SessionStore<String, Long> sessionStore = buildSessionStore(RETENTION_PERIOD, Serdes.String(), Serdes.Long());
+            final InternalMockProcessorContext context = new InternalMockProcessorContext(
+                TestUtils.tempDirectory(),
+                new StreamsConfig(streamsConfig),
+                recordCollector
+            );
+            final Time time = new SystemTime();
+            context.setTime(1L);
+            context.setSystemTimeMs(time.milliseconds());
+            sessionStore.init((StateStoreContext) context, sessionStore);
+
             // Advance stream time by inserting record with large enough timestamp that records with timestamp 0 are expired
             // Note that rocksdb will only expire segments at a time (where segment interval = 60,000 for this retention period)
             sessionStore.put(new Windowed<>("initial record", new SessionWindow(0, 2 * SEGMENT_INTERVAL)), 0L);
@@ -627,60 +631,67 @@ public abstract class AbstractSessionBytesStoreTest {
             sessionStore.put(new Windowed<>("late record", new SessionWindow(0, 0)), 0L);
             sessionStore.put(new Windowed<>("another on-time record", new SessionWindow(0, 2 * SEGMENT_INTERVAL)), 0L);
 
-            final List<String> messages = appender.getMessages();
-            assertThat(messages, hasItem("Skipping record for expired segment."));
+            final Map<MetricName, ? extends Metric> metrics = context.metrics().metrics();
+            final String metricScope = getMetricsScope();
+            final String threadId = Thread.currentThread().getName();
+            final Metric dropTotal;
+            final Metric dropRate;
+            if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
+                dropTotal = metrics.get(new MetricName(
+                    "expired-window-record-drop-total",
+                    "stream-" + metricScope + "-metrics",
+                    "The total number of dropped records due to an expired window",
+                    mkMap(
+                        mkEntry("client-id", threadId),
+                        mkEntry("task-id", "0_0"),
+                        mkEntry(metricScope + "-state-id", sessionStore.name())
+                    )
+                ));
+
+                dropRate = metrics.get(new MetricName(
+                    "expired-window-record-drop-rate",
+                    "stream-" + metricScope + "-metrics",
+                    "The average number of dropped records due to an expired window per second",
+                    mkMap(
+                        mkEntry("client-id", threadId),
+                        mkEntry("task-id", "0_0"),
+                        mkEntry(metricScope + "-state-id", sessionStore.name())
+                    )
+                ));
+            } else {
+                dropTotal = metrics.get(new MetricName(
+                    "dropped-records-total",
+                    "stream-task-metrics",
+                    "",
+                    mkMap(
+                        mkEntry("thread-id", threadId),
+                        mkEntry("task-id", "0_0")
+                    )
+                ));
+
+                dropRate = metrics.get(new MetricName(
+                    "dropped-records-rate",
+                    "stream-task-metrics",
+                    "",
+                    mkMap(
+                        mkEntry("thread-id", threadId),
+                        mkEntry("task-id", "0_0")
+                    )
+                ));
+            }
+            assertEquals(1.0, dropTotal.metricValue());
+            assertNotEquals(0.0, dropRate.metricValue());
+
+            final List<String> expectedPrefixes = Arrays.asList(
+                "WARN Skipping record for expired segment. "
+            );
+
+            final List<String> messages = logCaptureContext.getMessages();
+            for (final String expectedPrefix : expectedPrefixes) {
+                final Optional<String> matches = messages.stream().filter(message -> message.startsWith(expectedPrefix)).findAny();
+                assertTrue(matches.isPresent());
+            }
         }
-
-        final Map<MetricName, ? extends Metric> metrics = context.metrics().metrics();
-        final String metricScope = getMetricsScope();
-        final String threadId = Thread.currentThread().getName();
-        final Metric dropTotal;
-        final Metric dropRate;
-        if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
-            dropTotal = metrics.get(new MetricName(
-                "expired-window-record-drop-total",
-                "stream-" + metricScope + "-metrics",
-                "The total number of dropped records due to an expired window",
-                mkMap(
-                    mkEntry("client-id", threadId),
-                    mkEntry("task-id", "0_0"),
-                    mkEntry(metricScope + "-state-id", sessionStore.name())
-                )
-            ));
-
-            dropRate = metrics.get(new MetricName(
-                "expired-window-record-drop-rate",
-                "stream-" + metricScope + "-metrics",
-                "The average number of dropped records due to an expired window per second",
-                mkMap(
-                    mkEntry("client-id", threadId),
-                    mkEntry("task-id", "0_0"),
-                    mkEntry(metricScope + "-state-id", sessionStore.name())
-                )
-            ));
-        } else {
-            dropTotal = metrics.get(new MetricName(
-                "dropped-records-total",
-                "stream-task-metrics",
-                "",
-                mkMap(
-                    mkEntry("thread-id", threadId),
-                    mkEntry("task-id", "0_0")
-                )
-            ));
-
-            dropRate = metrics.get(new MetricName(
-                "dropped-records-rate",
-                "stream-task-metrics",
-                "",
-                mkMap(
-                    mkEntry("thread-id", threadId),
-                    mkEntry("task-id", "0_0")
-                )
-            ));
-        }
-        assertEquals(1.0, dropTotal.metricValue());
-        assertNotEquals(0.0, dropRate.metricValue());
     }
 
     @Test
@@ -730,22 +741,24 @@ public abstract class AbstractSessionBytesStoreTest {
 
     @Test
     public void shouldNotThrowInvalidRangeExceptionWithNegativeFromKey() {
-        final String keyFrom = Serdes.String().deserializer()
-            .deserialize("", Serdes.Integer().serializer().serialize("", -1));
-        final String keyTo = Serdes.String().deserializer()
-            .deserialize("", Serdes.Integer().serializer().serialize("", 1));
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(
+                this.getClass().getName() + "#shouldNotThrowInvalidRangeExceptionWithNegativeFromKey")) {
+            logCaptureContext.setLatch(1);
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister()) {
+            final String keyFrom = Serdes.String().deserializer()
+                .deserialize("", Serdes.Integer().serializer().serialize("", -1));
+            final String keyTo = Serdes.String().deserializer()
+                .deserialize("", Serdes.Integer().serializer().serialize("", 1));
+
             final KeyValueIterator<Windowed<String>, Long> iterator = sessionStore.findSessions(keyFrom, keyTo, 0L, 10L);
             assertFalse(iterator.hasNext());
 
-            final List<String> messages = appender.getMessages();
             assertThat(
-                messages,
-                hasItem("Returning empty iterator for fetch with invalid key range: from > to." +
+                logCaptureContext.getMessages(),
+                hasItem("WARN Returning empty iterator for fetch with invalid key range: from > to." +
                     " This may be due to range arguments set in the wrong order, " +
                     "or serdes that don't preserve ordering when lexicographically comparing the serialized bytes." +
-                    " Note that the built-in numerical serdes do not follow this for negative numbers")
+                    " Note that the built-in numerical serdes do not follow this for negative numbers ")
             );
         }
     }

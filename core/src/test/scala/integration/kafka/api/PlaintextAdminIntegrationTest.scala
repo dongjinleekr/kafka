@@ -44,6 +44,7 @@ import org.apache.kafka.common.{ConsumerGroupState, ElectionType, TopicPartition
 import org.junit.jupiter.api.Assertions._
 import org.junit.jupiter.api.{AfterEach, BeforeEach, Disabled, Test}
 import org.slf4j.LoggerFactory
+import org.apache.logging.log4j.core.config.Configurator
 
 import scala.annotation.nowarn
 import scala.jdk.CollectionConverters._
@@ -70,13 +71,13 @@ class PlaintextAdminIntegrationTest extends BaseAdminIntegrationTest {
   @BeforeEach
   override def setUp(): Unit = {
     super.setUp()
+    Configurator.reconfigure()
     brokerLoggerConfigResource = new ConfigResource(
       ConfigResource.Type.BROKER_LOGGER, servers.head.config.brokerId.toString)
   }
 
   @AfterEach
   override def tearDown(): Unit = {
-    teardownBrokerLoggers()
     super.tearDown()
   }
 
@@ -2003,9 +2004,23 @@ class PlaintextAdminIntegrationTest extends BaseAdminIntegrationTest {
     client = Admin.create(createConfig)
     LoggerFactory.getLogger("kafka.cluster.Replica").trace("Message to create the logger")
     val loggerConfig = describeBrokerLoggers()
+
+    // Logger name can't be empty.
+    assertNull(loggerConfig.get(""))
+
+    // "root" -> "OFF"
+    val rootLogLevel = loggerConfig.get(Log4jController.ROOT_LOGGER).value
+    assertEquals("OFF", rootLogLevel)
+
+    // Configured loggers: "kafka" -> "ERROR", "org.apache.kafka" -> "ERROR", "org.apache.zookeeper" -> "WARN"
+    assertEquals("ERROR", loggerConfig.get("kafka").value)
+    assertEquals("ERROR", loggerConfig.get("org.apache.kafka").value)
+    assertEquals("WARN", loggerConfig.get("org.apache.zookeeper").value)
+
+    // we expect the log level to be inherited from the first ancestor with a level configured.
+    // For example, `kafka.cluster.Replica` from `kafka` (ERROR).
     val kafkaLogLevel = loggerConfig.get("kafka").value()
     val logCleanerLogLevelConfig = loggerConfig.get("kafka.cluster.Replica")
-    // we expect the log level to be inherited from the first ancestor with a level configured
     assertEquals(kafkaLogLevel, logCleanerLogLevelConfig.value())
     assertEquals("kafka.cluster.Replica", logCleanerLogLevelConfig.name())
     assertEquals(ConfigEntry.ConfigSource.DYNAMIC_BROKER_LOGGER_CONFIG, logCleanerLogLevelConfig.source())
@@ -2199,29 +2214,6 @@ class PlaintextAdminIntegrationTest extends BaseAdminIntegrationTest {
 
   def describeBrokerLoggers(): Config =
     client.describeConfigs(Collections.singletonList(brokerLoggerConfigResource)).values.get(brokerLoggerConfigResource).get()
-
-  /**
-   * Due to the fact that log4j is not re-initialized across tests, changing a logger's log level persists across test classes.
-   * We need to clean up the changes done while testing.
-   */
-  private def teardownBrokerLoggers(): Unit = {
-    if (changedBrokerLoggers.nonEmpty) {
-      val validLoggers = describeBrokerLoggers().entries().asScala.filterNot(_.name.equals(Log4jController.ROOT_LOGGER)).map(_.name).toSet
-      val unsetBrokerLoggersEntries = changedBrokerLoggers
-        .intersect(validLoggers)
-        .map { logger => new AlterConfigOp(new ConfigEntry(logger, ""), AlterConfigOp.OpType.DELETE) }
-        .asJavaCollection
-
-      // ensure that we first reset the root logger to an arbitrary log level. Note that we cannot reset it to its original value
-      alterBrokerLoggers(List(
-        new AlterConfigOp(new ConfigEntry(Log4jController.ROOT_LOGGER, LogLevelConfig.FATAL_LOG_LEVEL), AlterConfigOp.OpType.SET)
-      ).asJavaCollection)
-      alterBrokerLoggers(unsetBrokerLoggersEntries)
-
-      changedBrokerLoggers.clear()
-    }
-  }
-
 }
 
 object PlaintextAdminIntegrationTest {
