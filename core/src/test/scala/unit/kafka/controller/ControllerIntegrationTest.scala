@@ -24,18 +24,19 @@ import kafka.api.{ApiVersion, KAFKA_2_6_IV0, KAFKA_2_7_IV0, LeaderAndIsr}
 import kafka.controller.KafkaController.AlterIsrCallback
 import kafka.metrics.KafkaYammerMetrics
 import kafka.server.{KafkaConfig, KafkaServer, QuorumTestHarness}
-import kafka.utils.{LogCaptureAppender, TestUtils}
+import kafka.utils.TestUtils
 import kafka.zk.{FeatureZNodeStatus, _}
 import org.apache.kafka.common.errors.{ControllerMovedException, StaleBrokerEpochException}
 import org.apache.kafka.common.feature.Features
 import org.apache.kafka.common.metrics.KafkaMetric
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.{ElectionType, TopicPartition, Uuid}
-import org.apache.log4j.Level
+import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.Assertions.{assertEquals, assertNotEquals, assertTrue}
 import org.junit.jupiter.api.{AfterEach, BeforeEach, Test, TestInfo}
 import org.mockito.Mockito.{doAnswer, spy, verify}
 import org.mockito.invocation.InvocationOnMock
+import unit.kafka.utils.LogCaptureContext
 
 import scala.collection.{Map, Seq, mutable}
 import scala.jdk.CollectionConverters._
@@ -611,7 +612,8 @@ class ControllerIntegrationTest extends QuorumTestHarness {
     val assignment = Map(tp.partition -> Seq(0))
     TestUtils.createTopic(zkClient, tp.topic(), assignment, servers)
 
-    testControllerMove(() => zkClient.createPreferredReplicaElection(Set(tp)))
+    testControllerMove(
+      () => zkClient.createPreferredReplicaElection(Set(tp)))
   }
 
   @Test
@@ -623,7 +625,8 @@ class ControllerIntegrationTest extends QuorumTestHarness {
     TestUtils.createTopic(zkClient, tp.topic(), assignment, servers)
 
     val reassignment = Map(tp -> Seq(0))
-    testControllerMove(() => zkClient.createPartitionReassignment(reassignment))
+    testControllerMove(
+      () => zkClient.createPartitionReassignment(reassignment))
   }
 
   @Test
@@ -1288,8 +1291,8 @@ class ControllerIntegrationTest extends QuorumTestHarness {
 
   private def testControllerMove(fun: () => Unit): Unit = {
     val controller = getController().kafkaController
-    val appender = LogCaptureAppender.createAndRegister()
-    val previousLevel = LogCaptureAppender.setClassLoggerLevel(controller.getClass, Level.INFO)
+    val logCaptureContext = LogCaptureContext(scala.Predef.Map(classOf[KafkaController].getName -> "INFO"))
+    logCaptureContext.setLatch(1)
 
     try {
       TestUtils.waitUntilTrue(() => {
@@ -1317,14 +1320,13 @@ class ControllerIntegrationTest extends QuorumTestHarness {
       TestUtils.waitUntilTrue(() => !controller.isActive, "Controller fails to resign")
 
       // Expect to capture the ControllerMovedException in the log of ControllerEventThread
-      val event = appender.getMessages.find(e => e.getLevel == Level.INFO
-        && e.getThrowableInformation != null
-        && e.getThrowableInformation.getThrowable.getClass.getName.equals(classOf[ControllerMovedException].getName))
+      logCaptureContext.await(30, TimeUnit.SECONDS)
+      val event = logCaptureContext.getMessages.find(e => e.getLevel == Level.INFO
+        && e.getThrown != null
+        && e.getThrown.getClass.getName.equals(classOf[ControllerMovedException].getName))
       assertTrue(event.isDefined)
-
     } finally {
-      LogCaptureAppender.unregister(appender)
-      LogCaptureAppender.setClassLoggerLevel(controller.eventManager.thread.getClass, previousLevel)
+      logCaptureContext.close
     }
   }
 
