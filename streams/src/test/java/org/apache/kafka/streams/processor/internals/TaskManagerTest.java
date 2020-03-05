@@ -42,8 +42,8 @@ import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.TaskId;
 import org.apache.kafka.streams.processor.internals.StreamThread.ProcessingMode;
 import org.apache.kafka.streams.processor.internals.Task.State;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.state.internals.OffsetCheckpoint;
+import org.apache.kafka.test.LogCaptureContext;
 import org.easymock.EasyMock;
 import org.easymock.EasyMockRunner;
 import org.easymock.Mock;
@@ -357,7 +357,7 @@ public class TaskManagerTest {
         replay(activeTaskCreator);
         taskManager.handleAssignment(taskId00Assignment, emptyMap());
 
-        assertThat(uninitializedTask.state(), is(State.CREATED));
+        assertThat(uninitializedTask.state(), is(Task.State.CREATED));
 
         assertThat(taskManager.getTaskOffsetSums(), is(expectedOffsetSums));
     }
@@ -384,7 +384,7 @@ public class TaskManagerTest {
 
         closedTask.suspend();
         closedTask.closeClean();
-        assertThat(closedTask.state(), is(State.CLOSED));
+        assertThat(closedTask.state(), is(Task.State.CLOSED));
 
         assertThat(taskManager.getTaskOffsetSums(), is(expectedOffsetSums));
     }
@@ -2330,18 +2330,21 @@ public class TaskManagerTest {
 
     @Test
     public void shouldHaveRemainingPartitionsUncleared() {
-        final StateMachineTask task00 = new StateMachineTask(taskId00, taskId00Partitions, true);
-        final Map<TopicPartition, OffsetAndMetadata> offsets = singletonMap(t1p0, new OffsetAndMetadata(0L, null));
-        task00.setCommittableOffsetsAndMetadata(offsets);
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(
+                this.getClass().getName() + "#shouldHaveRemainingPartitionsUncleared")) {
+            logCaptureContext.setLatch(2);
 
-        expectRestoreToBeCompleted(consumer, changeLogReader);
-        expect(activeTaskCreator.createTasks(anyObject(), eq(taskId00Assignment))).andReturn(singletonList(task00));
-        consumer.commitSync(offsets);
-        expectLastCall();
+            final StateMachineTask task00 = new StateMachineTask(taskId00, taskId00Partitions, true);
+            final Map<TopicPartition, OffsetAndMetadata> offsets = singletonMap(t1p0, new OffsetAndMetadata(0L, null));
+            task00.setCommittableOffsetsAndMetadata(offsets);
 
-        replay(activeTaskCreator, consumer, changeLogReader);
+            expectRestoreToBeCompleted(consumer, changeLogReader);
+            expect(activeTaskCreator.createTasks(anyObject(), eq(taskId00Assignment))).andReturn(singletonList(task00));
+            consumer.commitSync(offsets);
+            expectLastCall();
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(TaskManager.class)) {
+            replay(activeTaskCreator, consumer, changeLogReader);
+
             taskManager.handleAssignment(taskId00Assignment, emptyMap());
             assertThat(taskManager.tryToCompleteRestoration(), is(true));
             assertThat(task00.state(), is(Task.State.RUNNING));
@@ -2349,13 +2352,12 @@ public class TaskManagerTest {
             taskManager.handleRevocation(mkSet(t1p0, new TopicPartition("unknown", 0)));
             assertThat(task00.state(), is(Task.State.SUSPENDED));
 
-            final List<String> messages = appender.getMessages();
             assertThat(
-                messages,
-                hasItem("taskManagerTestThe following partitions [unknown-0] are missing " +
+                logCaptureContext.getMessages(),
+                hasItem("WARN taskManagerTestThe following partitions [unknown-0] are missing " +
                     "from the task partitions. It could potentially due to race " +
                     "condition of consumer detecting the heartbeat failure, or the " +
-                    "tasks have been cleaned up by the handleAssignment callback.")
+                    "tasks have been cleaned up by the handleAssignment callback. ")
             );
         }
     }

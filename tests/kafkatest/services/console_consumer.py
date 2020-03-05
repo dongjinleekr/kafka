@@ -171,7 +171,7 @@ class ConsoleConsumer(KafkaPathResolverMixin, JmxMixin, BackgroundThreadService)
         cmd = fix_opts_for_new_jvm(node)
         cmd += "export JMX_PORT=%(jmx_port)s; " \
               "export LOG_DIR=%(log_dir)s; " \
-              "export KAFKA_LOG4J_OPTS=\"-Dlog4j.configuration=file:%(log4j_config)s\"; " \
+              "export KAFKA_LOG4J_OPTS=\"-Dlog4j.configurationFile=file:%(log4j_config)s\"; " \
               "export KAFKA_OPTS=%(kafka_opts)s; " \
               "%(console_consumer)s " \
               "--topic %(topic)s " \
@@ -250,7 +250,7 @@ class ConsoleConsumer(KafkaPathResolverMixin, JmxMixin, BackgroundThreadService)
         node.account.create_file(ConsoleConsumer.CONFIG_FILE, prop_file)
 
         # Create and upload log properties
-        log_config = self.render('tools_log4j.properties', log_file=ConsoleConsumer.LOG_FILE)
+        log_config = self.render('tools_log4j2.properties', log_file=ConsoleConsumer.LOG_FILE)
         node.account.create_file(ConsoleConsumer.LOG4J_CONFIG, log_config)
 
         # Run and capture output

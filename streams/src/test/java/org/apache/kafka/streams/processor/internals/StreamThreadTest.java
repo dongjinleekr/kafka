@@ -64,11 +64,11 @@ import org.apache.kafka.streams.processor.TaskId;
 import org.apache.kafka.streams.processor.TaskMetadata;
 import org.apache.kafka.streams.processor.ThreadMetadata;
 import org.apache.kafka.streams.processor.internals.metrics.StreamsMetricsImpl;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.streams.state.internals.OffsetCheckpoint;
+import org.apache.kafka.test.LogCaptureContext;
 import org.apache.kafka.test.MockClientSupplier;
 import org.apache.kafka.test.MockKeyValueStoreBuilder;
 import org.apache.kafka.test.MockProcessor;
@@ -115,6 +115,7 @@ import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.mock;
 import static org.easymock.EasyMock.verify;
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -1887,82 +1888,91 @@ public class StreamThreadTest {
     }
 
     private void shouldLogAndRecordSkippedMetricForDeserializationException(final String builtInMetricsVersion) {
-        internalTopologyBuilder.addSource(null, "source1", null, null, null, topic1);
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldLogAndRecordSkippedMetricForDeserializationException:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(16);
 
-        final Properties config = configProps(false);
-        config.setProperty(
-            StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
-            LogAndContinueExceptionHandler.class.getName()
-        );
-        config.setProperty(
-            StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG,
-            builtInMetricsVersion
-        );
-        config.setProperty(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.Integer().getClass().getName());
-        final StreamThread thread = createStreamThread(CLIENT_ID, new StreamsConfig(config), false);
+            internalTopologyBuilder.addSource(null, "source1", null, null, null, topic1);
 
-        thread.setState(StreamThread.State.STARTING);
-        thread.setState(StreamThread.State.PARTITIONS_REVOKED);
-
-        final TaskId task1 = new TaskId(0, t1p1.partition());
-        final Set<TopicPartition> assignedPartitions = Collections.singleton(t1p1);
-        thread.taskManager().handleAssignment(
-            Collections.singletonMap(task1, assignedPartitions),
-            emptyMap());
-
-        final MockConsumer<byte[], byte[]> mockConsumer = (MockConsumer<byte[], byte[]>) thread.mainConsumer();
-        mockConsumer.assign(Collections.singleton(t1p1));
-        mockConsumer.updateBeginningOffsets(Collections.singletonMap(t1p1, 0L));
-        thread.rebalanceListener().onPartitionsAssigned(assignedPartitions);
-        thread.runOnce();
-
-        if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
-            final MetricName skippedTotalMetric = metrics.metricName(
-                "skipped-records-total",
-                "stream-metrics",
-                Collections.singletonMap("client-id", thread.getName())
+            final Properties config = configProps(false);
+            config.setProperty(
+                StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
+                LogAndContinueExceptionHandler.class.getName()
             );
-            final MetricName skippedRateMetric = metrics.metricName(
-                "skipped-records-rate",
-                "stream-metrics",
-                Collections.singletonMap("client-id", thread.getName())
+            config.setProperty(
+                StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG,
+                builtInMetricsVersion
             );
-            assertEquals(0.0, metrics.metric(skippedTotalMetric).metricValue());
-            assertEquals(0.0, metrics.metric(skippedRateMetric).metricValue());
-        }
+            config.setProperty(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.Integer().getClass().getName());
+            final StreamThread thread = createStreamThread(CLIENT_ID, new StreamsConfig(config), false);
 
-        long offset = -1;
-        mockConsumer.addRecord(new ConsumerRecord<>(
-            t1p1.topic(),
-            t1p1.partition(),
-            ++offset,
-            -1,
-            TimestampType.CREATE_TIME,
-            ConsumerRecord.NULL_CHECKSUM,
-            -1,
-            -1,
-            new byte[0],
-            "I am not an integer.".getBytes()));
-        mockConsumer.addRecord(new ConsumerRecord<>(
-            t1p1.topic(),
-            t1p1.partition(),
-            ++offset,
-            -1,
-            TimestampType.CREATE_TIME,
-            ConsumerRecord.NULL_CHECKSUM,
-            -1,
-            -1,
-            new byte[0],
-            "I am not an integer.".getBytes()));
+            thread.setState(StreamThread.State.STARTING);
+            thread.setState(StreamThread.State.PARTITIONS_REVOKED);
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(RecordDeserializer.class)) {
+            final TaskId task1 = new TaskId(0, t1p1.partition());
+            final Set<TopicPartition> assignedPartitions = Collections.singleton(t1p1);
+            thread.taskManager().handleAssignment(
+                Collections.singletonMap(task1, assignedPartitions),
+                emptyMap());
+
+            final MockConsumer<byte[], byte[]> mockConsumer = (MockConsumer<byte[], byte[]>) thread.mainConsumer();
+            mockConsumer.assign(Collections.singleton(t1p1));
+            mockConsumer.updateBeginningOffsets(Collections.singletonMap(t1p1, 0L));
+            thread.rebalanceListener().onPartitionsAssigned(assignedPartitions);
             thread.runOnce();
 
-            final List<String> strings = appender.getMessages();
-            assertTrue(strings.contains("stream-thread [" + Thread.currentThread().getName() + "] task [0_1]" +
-                " Skipping record due to deserialization error. topic=[topic1] partition=[1] offset=[0]"));
-            assertTrue(strings.contains("stream-thread [" + Thread.currentThread().getName() + "] task [0_1]" +
-                " Skipping record due to deserialization error. topic=[topic1] partition=[1] offset=[1]"));
+            if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
+                final MetricName skippedTotalMetric = metrics.metricName(
+                    "skipped-records-total",
+                    "stream-metrics",
+                    Collections.singletonMap("client-id", thread.getName())
+                );
+                final MetricName skippedRateMetric = metrics.metricName(
+                    "skipped-records-rate",
+                    "stream-metrics",
+                    Collections.singletonMap("client-id", thread.getName())
+                );
+                assertEquals(0.0, metrics.metric(skippedTotalMetric).metricValue());
+                assertEquals(0.0, metrics.metric(skippedRateMetric).metricValue());
+            }
+
+            long offset = -1;
+            mockConsumer.addRecord(new ConsumerRecord<>(
+                t1p1.topic(),
+                t1p1.partition(),
+                ++offset,
+                -1,
+                TimestampType.CREATE_TIME,
+                ConsumerRecord.NULL_CHECKSUM,
+                -1,
+                -1,
+                new byte[0],
+                "I am not an integer.".getBytes()));
+            mockConsumer.addRecord(new ConsumerRecord<>(
+                t1p1.topic(),
+                t1p1.partition(),
+                ++offset,
+                -1,
+                TimestampType.CREATE_TIME,
+                ConsumerRecord.NULL_CHECKSUM,
+                -1,
+                -1,
+                new byte[0],
+                "I am not an integer.".getBytes()));
+
+            thread.runOnce();
+
+            assertThat(
+                logCaptureContext.getMessages(),
+                hasItem(startsWith("WARN stream-thread [" + Thread.currentThread().getName() + "] task" +
+                    " [0_1] Skipping record due to deserialization error. topic=[topic1] partition=[1] offset=[0]"))
+            );
+
+            assertThat(
+                logCaptureContext.getMessages(),
+                hasItem(startsWith("WARN stream-thread [" + Thread.currentThread().getName() + "] task" +
+                    " [0_1] Skipping record due to deserialization error. topic=[topic1] partition=[1] offset=[1]"))
+            );
         }
     }
 
@@ -2226,50 +2236,53 @@ public class StreamThreadTest {
     }
 
     private void shouldLogAndRecordSkippedRecordsForInvalidTimestamps(final String builtInMetricsVersion) {
-        internalTopologyBuilder.addSource(null, "source1", null, null, null, topic1);
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldLogAndRecordSkippedRecordsForInvalidTimestamps:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(24);
 
-        final Properties config = configProps(false);
-        config.setProperty(
-            StreamsConfig.DEFAULT_TIMESTAMP_EXTRACTOR_CLASS_CONFIG,
-            LogAndSkipOnInvalidTimestamp.class.getName()
-        );
-        config.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
-        final StreamThread thread = createStreamThread(CLIENT_ID, new StreamsConfig(config), false);
+            internalTopologyBuilder.addSource(null, "source1", null, null, null, topic1);
 
-        thread.setState(StreamThread.State.STARTING);
-        thread.setState(StreamThread.State.PARTITIONS_REVOKED);
+            final Properties config = configProps(false);
+            config.setProperty(
+                    StreamsConfig.DEFAULT_TIMESTAMP_EXTRACTOR_CLASS_CONFIG,
+                    LogAndSkipOnInvalidTimestamp.class.getName()
+            );
+            config.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
+            final StreamThread thread = createStreamThread(CLIENT_ID, new StreamsConfig(config), false);
 
-        final TaskId task1 = new TaskId(0, t1p1.partition());
-        final Set<TopicPartition> assignedPartitions = Collections.singleton(t1p1);
-        thread.taskManager().handleAssignment(
-            Collections.singletonMap(
-                task1,
-                assignedPartitions),
-            emptyMap());
+            thread.setState(StreamThread.State.STARTING);
+            thread.setState(StreamThread.State.PARTITIONS_REVOKED);
 
-        final MockConsumer<byte[], byte[]> mockConsumer = (MockConsumer<byte[], byte[]>) thread.mainConsumer();
-        mockConsumer.assign(Collections.singleton(t1p1));
-        mockConsumer.updateBeginningOffsets(Collections.singletonMap(t1p1, 0L));
-        thread.rebalanceListener().onPartitionsAssigned(assignedPartitions);
-        thread.runOnce();
+            final TaskId task1 = new TaskId(0, t1p1.partition());
+            final Set<TopicPartition> assignedPartitions = Collections.singleton(t1p1);
+            thread.taskManager().handleAssignment(
+                Collections.singletonMap(
+                    task1,
+                    assignedPartitions),
+                emptyMap());
 
-        final MetricName skippedTotalMetric = metrics.metricName(
-            "skipped-records-total",
-            "stream-metrics",
-            Collections.singletonMap("client-id", thread.getName())
-        );
-        final MetricName skippedRateMetric = metrics.metricName(
-            "skipped-records-rate",
-            "stream-metrics",
-            Collections.singletonMap("client-id", thread.getName())
-        );
+            final MockConsumer<byte[], byte[]> mockConsumer = (MockConsumer<byte[], byte[]>) thread.mainConsumer();
+            mockConsumer.assign(Collections.singleton(t1p1));
+            mockConsumer.updateBeginningOffsets(Collections.singletonMap(t1p1, 0L));
+            thread.rebalanceListener().onPartitionsAssigned(assignedPartitions);
+            thread.runOnce();
 
-        if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
-            assertEquals(0.0, metrics.metric(skippedTotalMetric).metricValue());
-            assertEquals(0.0, metrics.metric(skippedRateMetric).metricValue());
-        }
+            final MetricName skippedTotalMetric = metrics.metricName(
+                "skipped-records-total",
+                "stream-metrics",
+                Collections.singletonMap("client-id", thread.getName())
+            );
+            final MetricName skippedRateMetric = metrics.metricName(
+                "skipped-records-rate",
+                "stream-metrics",
+                Collections.singletonMap("client-id", thread.getName())
+            );
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(RecordQueue.class)) {
+            if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
+                assertEquals(0.0, metrics.metric(skippedTotalMetric).metricValue());
+                assertEquals(0.0, metrics.metric(skippedRateMetric).metricValue());
+            }
+
             long offset = -1;
             addRecord(mockConsumer, ++offset);
             addRecord(mockConsumer, ++offset);
@@ -2295,44 +2308,49 @@ public class StreamThreadTest {
             addRecord(mockConsumer, ++offset, 1L);
             thread.runOnce();
 
-            final List<String> strings = appender.getMessages();
+            final String threadTaskPrefix = "WARN stream-thread [" + Thread.currentThread().getName() + "] task [0_1] ";
 
-            final String threadTaskPrefix = "stream-thread [" + Thread.currentThread().getName() + "] task [0_1] ";
-            assertTrue(strings.contains(
-                threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
+            assertThat(
+                logCaptureContext.getMessages(),
+                hasItem(threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
                     "topic=[topic1] partition=[1] offset=[0] extractedTimestamp=[-1] " +
-                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp]"
-            ));
-            assertTrue(strings.contains(
-                threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
-                    "topic=[topic1] partition=[1] offset=[1] extractedTimestamp=[-1] " +
-                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp]"
-            ));
-            assertTrue(strings.contains(
-                threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
-                    "topic=[topic1] partition=[1] offset=[2] extractedTimestamp=[-1] " +
-                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp]"
-            ));
-            assertTrue(strings.contains(
-                threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
-                    "topic=[topic1] partition=[1] offset=[3] extractedTimestamp=[-1] " +
-                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp]"
-            ));
-            assertTrue(strings.contains(
-                threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
-                    "topic=[topic1] partition=[1] offset=[4] extractedTimestamp=[-1] " +
-                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp]"
-            ));
-            assertTrue(strings.contains(
-                threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
-                    "topic=[topic1] partition=[1] offset=[5] extractedTimestamp=[-1] " +
-                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp]"
-            ));
-        }
+                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp] ")
+            );
 
-        if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
-            assertEquals(6.0, metrics.metric(skippedTotalMetric).metricValue());
-            assertNotEquals(0.0, metrics.metric(skippedRateMetric).metricValue());
+            assertThat(
+                logCaptureContext.getMessages(),
+                hasItem(threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
+                    "topic=[topic1] partition=[1] offset=[1] extractedTimestamp=[-1] " +
+                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp] ")
+            );
+
+            assertThat(
+                logCaptureContext.getMessages(),
+                hasItem(threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
+                    "topic=[topic1] partition=[1] offset=[2] extractedTimestamp=[-1] " +
+                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp] ")
+            );
+
+            assertThat(
+                logCaptureContext.getMessages(),
+                hasItem(threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
+                    "topic=[topic1] partition=[1] offset=[3] extractedTimestamp=[-1] " +
+                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp] ")
+            );
+
+            assertThat(
+                logCaptureContext.getMessages(),
+                hasItem(threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
+                    "topic=[topic1] partition=[1] offset=[4] extractedTimestamp=[-1] " +
+                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp] ")
+            );
+
+            assertThat(
+                logCaptureContext.getMessages(),
+                hasItem(threadTaskPrefix + "Skipping record due to negative extracted timestamp. " +
+                    "topic=[topic1] partition=[1] offset=[5] extractedTimestamp=[-1] " +
+                    "extractor=[org.apache.kafka.streams.processor.LogAndSkipOnInvalidTimestamp] ")
+            );
         }
     }
 

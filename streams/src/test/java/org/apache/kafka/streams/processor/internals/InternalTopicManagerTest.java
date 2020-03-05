@@ -36,7 +36,7 @@ import org.apache.kafka.common.internals.KafkaFutureImpl;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.StreamsException;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
+import org.apache.kafka.test.LogCaptureContext;
 import org.easymock.EasyMock;
 import org.junit.After;
 import org.junit.Before;
@@ -50,6 +50,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -264,31 +265,33 @@ public class InternalTopicManagerTest {
 
     @Test
     public void shouldLogWhenTopicNotFoundAndNotThrowException() {
-        mockAdminClient.addTopic(
-            false,
-            topic,
-            Collections.singletonList(new TopicPartitionInfo(0, broker1, cluster, Collections.emptyList())),
-            null);
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(
+                this.getClass().getName() + "#shouldLogWhenTopicNotFoundAndNotThrowException",
+                Collections.singletonMap(InternalTopicManager.class.getName(), "DEBUG"))) {
+            logCaptureContext.setLatch(4);
 
-        final InternalTopicConfig internalTopicConfig = new RepartitionTopicConfig(topic, Collections.emptyMap());
-        internalTopicConfig.setNumberOfPartitions(1);
+            mockAdminClient.addTopic(
+                false,
+                topic,
+                Collections.singletonList(new TopicPartitionInfo(0, broker1, cluster, Collections.emptyList())),
+                null);
 
-        final InternalTopicConfig internalTopicConfigII =
-            new RepartitionTopicConfig("internal-topic", Collections.emptyMap());
-        internalTopicConfigII.setNumberOfPartitions(1);
+            final InternalTopicConfig internalTopicConfig = new RepartitionTopicConfig(topic, Collections.emptyMap());
+            internalTopicConfig.setNumberOfPartitions(1);
 
-        final Map<String, InternalTopicConfig> topicConfigMap = new HashMap<>();
-        topicConfigMap.put(topic, internalTopicConfig);
-        topicConfigMap.put("internal-topic", internalTopicConfigII);
+            final InternalTopicConfig internalTopicConfigII =
+                    new RepartitionTopicConfig("internal-topic", Collections.emptyMap());
+            internalTopicConfigII.setNumberOfPartitions(1);
 
-        LogCaptureAppender.setClassLoggerToDebug(InternalTopicManager.class);
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(InternalTopicManager.class)) {
+            final Map<String, InternalTopicConfig> topicConfigMap = new HashMap<>();
+            topicConfigMap.put(topic, internalTopicConfig);
+            topicConfigMap.put("internal-topic", internalTopicConfigII);
+
             internalTopicManager.makeReady(topicConfigMap);
 
             assertThat(
-                appender.getMessages(),
-                hasItem("stream-thread [" + threadName + "] Topic internal-topic is unknown or not found, hence not existed yet:" +
-                    " org.apache.kafka.common.errors.UnknownTopicOrPartitionException: Topic internal-topic not found.")
+                logCaptureContext.getMessages(),
+                hasItem(containsString("Topic internal-topic is unknown or not found, hence not existed yet"))
             );
         }
     }

@@ -29,7 +29,6 @@ import org.apache.kafka.streams.errors.TaskCorruptedException;
 import org.apache.kafka.streams.processor.StateRestoreCallback;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.TaskId;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.processor.internals.ProcessorStateManager.StateStoreMetadata;
 import org.apache.kafka.streams.state.TimestampedBytesStore;
 import org.apache.kafka.streams.state.internals.OffsetCheckpoint;
@@ -663,31 +662,6 @@ public class ProcessorStateManagerTest {
         final ProcessorStateManager stateManager = getStateManager(Task.TaskType.ACTIVE);
 
         assertThrows(IllegalStateException.class, () -> stateManager.restore(storeMetadata, Collections.emptyList()));
-    }
-
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
-    @Test
-    public void shouldLogAWarningIfCheckpointThrowsAnIOException() {
-        final ProcessorStateManager stateMgr = getStateManager(Task.TaskType.ACTIVE);
-        stateMgr.registerStore(persistentStore, persistentStore.stateRestoreCallback);
-        stateDirectory.clean();
-
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(ProcessorStateManager.class)) {
-            stateMgr.checkpoint(singletonMap(persistentStorePartition, 10L));
-
-            boolean foundExpectedLogMessage = false;
-            for (final LogCaptureAppender.Event event : appender.getEvents()) {
-                if ("WARN".equals(event.getLevel())
-                    && event.getMessage().startsWith("process-state-manager-test Failed to write offset checkpoint file to [")
-                    && event.getMessage().endsWith(".checkpoint]")
-                    && event.getThrowableInfo().get().startsWith("java.io.FileNotFoundException: ")) {
-
-                    foundExpectedLogMessage = true;
-                    break;
-                }
-            }
-            assertTrue(foundExpectedLogMessage);
-        }
     }
 
     @Test

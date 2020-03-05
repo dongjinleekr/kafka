@@ -23,7 +23,6 @@ import org.junit.{After, Before, Test}
 import scala.util.Random
 import scala.jdk.CollectionConverters._
 import scala.collection.{Map, Seq}
-import org.apache.log4j.{Level, Logger}
 import java.util.Properties
 import java.util.concurrent.ExecutionException
 
@@ -39,6 +38,8 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.clients.admin.{Admin, AdminClientConfig, AlterConfigsResult, Config, ConfigEntry}
 import org.junit.Assert._
 import org.scalatest.Assertions.intercept
+import org.apache.logging.log4j.Level
+import unit.kafka.utils.LoggingUtil
 
 import scala.annotation.nowarn
 
@@ -60,9 +61,6 @@ class UncleanLeaderElectionTest extends ZooKeeperTestHarness {
   val topic = "topic" + random.nextLong
   val partitionId = 0
 
-  val kafkaApisLogger = Logger.getLogger(classOf[kafka.server.KafkaApis])
-  val networkProcessorLogger = Logger.getLogger(classOf[kafka.network.Processor])
-
   @Before
   override def setUp(): Unit = {
     super.setUp()
@@ -77,8 +75,8 @@ class UncleanLeaderElectionTest extends ZooKeeperTestHarness {
     }
 
     // temporarily set loggers to a higher level so that tests run quietly
-    kafkaApisLogger.setLevel(Level.FATAL)
-    networkProcessorLogger.setLevel(Level.FATAL)
+    LoggingUtil.setLevel("kafka.server.KafkaApis", Level.FATAL)
+    LoggingUtil.setLevel("kafka.network.Processor", Level.FATAL)
   }
 
   @After
@@ -87,8 +85,8 @@ class UncleanLeaderElectionTest extends ZooKeeperTestHarness {
     servers.foreach(server => CoreUtils.delete(server.config.logDirs))
 
     // restore log levels
-    kafkaApisLogger.setLevel(Level.ERROR)
-    networkProcessorLogger.setLevel(Level.ERROR)
+    LoggingUtil.setLevel("kafka.server.KafkaApis", Level.ERROR)
+    LoggingUtil.setLevel("kafka.network.Processor", Level.ERROR)
 
     super.tearDown()
   }

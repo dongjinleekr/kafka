@@ -31,9 +31,9 @@ import org.apache.kafka.streams.kstream.internals.Change;
 import org.apache.kafka.streams.kstream.internals.SessionWindow;
 import org.apache.kafka.streams.processor.internals.MockStreamsMetrics;
 import org.apache.kafka.streams.processor.internals.ProcessorRecordContext;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.SessionStore;
+import org.apache.kafka.test.LogCaptureContext;
 import org.apache.kafka.test.InternalMockProcessorContext;
 import org.apache.kafka.test.TestUtils;
 import org.easymock.EasyMock;
@@ -521,19 +521,21 @@ public class CachingSessionStoreTest {
 
     @Test
     public void shouldNotThrowInvalidRangeExceptionWithNegativeFromKey() {
-        final Bytes keyFrom = Bytes.wrap(Serdes.Integer().serializer().serialize("", -1));
-        final Bytes keyTo = Bytes.wrap(Serdes.Integer().serializer().serialize("", 1));
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(
+                this.getClass().getName() + "#shouldNotThrowInvalidRangeExceptionWithNegativeFromKey")) {
+            logCaptureContext.setLatch(2);
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister(CachingSessionStore.class)) {
+            final Bytes keyFrom = Bytes.wrap(Serdes.Integer().serializer().serialize("", -1));
+            final Bytes keyTo = Bytes.wrap(Serdes.Integer().serializer().serialize("", 1));
+
             final KeyValueIterator<Windowed<Bytes>, byte[]> iterator = cachingStore.findSessions(keyFrom, keyTo, 0L, 10L);
             assertFalse(iterator.hasNext());
 
-            final List<String> messages = appender.getMessages();
             assertThat(
-                messages,
-                hasItem("Returning empty iterator for fetch with invalid key range: from > to." +
+                logCaptureContext.getMessages(),
+                hasItem("WARN Returning empty iterator for fetch with invalid key range: from > to." +
                     " This may be due to serdes that don't preserve ordering when lexicographically comparing the serialized bytes." +
-                    " Note that the built-in numerical serdes do not follow this for negative numbers")
+                    " Note that the built-in numerical serdes do not follow this for negative numbers ")
             );
         }
     }

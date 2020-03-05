@@ -725,7 +725,8 @@ project(':core') {
     // ZooKeeperMain depends on commons-cli but declares the dependency as `provided`
     compile libs.commonsCli
 
-    compileOnly libs.log4j
+    compileOnly libs.log4j2Api
+    compileOnly libs.log4j2Core
 
     testCompile project(':clients').sourceSets.test.output
     testCompile libs.bcpkix
@@ -746,8 +747,11 @@ project(':core') {
     testCompile libs.apachedsMavibotPartition
     testCompile libs.apachedsJdbmPartition
     testCompile libs.junit
+    testCompile libs.log4j2Api
+    testCompile libs.log4j2Core
+    testCompile libs.log4j2CoreTest
     testCompile libs.scalatest
-    testCompile libs.slf4jlog4j
+    testCompile libs.slf4jlog4j2
     testCompile libs.jfreechart
   }
 
@@ -773,8 +777,8 @@ project(':core') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1000,7 +1004,7 @@ project(':clients') {
     testCompile libs.junit
     testCompile libs.mockitoCore
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
     testRuntime libs.jacksonDatabind
     testRuntime libs.jacksonJDK8Datatypes
     testCompile libs.jacksonJaxrsJsonProvider
@@ -1121,7 +1125,7 @@ project(':tools') {
     testCompile libs.powermockJunit4
     testCompile libs.powermockEasymock
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
   }
 
   javadoc {
@@ -1130,8 +1134,8 @@ project(':tools') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1166,8 +1170,10 @@ project(':streams') {
     testCompile project(':clients').sourceSets.test.output
     testCompile project(':core')
     testCompile project(':core').sourceSets.test.output
-    testCompile libs.log4j
     testCompile libs.junit
+    testCompile libs.log4j2Api
+    testCompile libs.log4j2Core
+    testCompile libs.log4j2CoreTest
     testCompile libs.easymock
     testCompile libs.powermockJunit4
     testCompile libs.powermockEasymock
@@ -1175,7 +1181,7 @@ project(':streams') {
     testCompile libs.hamcrest
 
     testRuntimeOnly project(':streams:test-utils')
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
   }
 
   task processMessages(type:JavaExec) {
@@ -1210,8 +1216,8 @@ project(':streams') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
       include('*hamcrest*')
     }
     from (configurations.runtime) {
@@ -1300,7 +1306,7 @@ project(':streams:streams-scala') {
     testCompile libs.easymock
     testCompile libs.hamcrest
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
   }
 
   javadoc {
@@ -1334,7 +1340,7 @@ project(':streams:test-utils') {
     testCompile libs.easymock
     testCompile libs.hamcrest
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
   }
 
   javadoc {
@@ -1362,7 +1368,7 @@ project(':streams:examples') {
   dependencies {
     compile project(':streams')
     compile project(':connect:json')  // this dependency should be removed after we unify data API
-    compile libs.slf4jlog4j
+    compile libs.slf4jlog4j2
 
     testCompile project(':streams:test-utils')
     testCompile project(':clients').sourceSets.test.output // for org.apache.kafka.test.IntegrationTest
@@ -1609,7 +1615,7 @@ project(':connect:api') {
 
     testCompile libs.junit
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
     testCompile project(':clients').sourceSets.test.output
   }
 
@@ -1624,8 +1630,8 @@ project(':connect:api') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1652,7 +1658,7 @@ project(':connect:transforms') {
     testCompile libs.powermockJunit4
     testCompile libs.powermockEasymock
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
     testCompile project(':clients').sourceSets.test.output
   }
 
@@ -1662,8 +1668,8 @@ project(':connect:transforms') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1692,7 +1698,7 @@ project(':connect:json') {
     testCompile libs.powermockJunit4
     testCompile libs.powermockEasymock
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
     testCompile project(':clients').sourceSets.test.output
   }
 
@@ -1702,8 +1708,8 @@ project(':connect:json') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1729,6 +1735,7 @@ project(':connect:runtime') {
     compile project(':connect:json')
     compile project(':connect:transforms')
 
+    compile libs.log4j2Core
     compile libs.slf4jApi
     compile libs.jacksonJaxrsJsonProvider
     compile libs.jerseyContainerServlet
@@ -1754,7 +1761,7 @@ project(':connect:runtime') {
     testCompile project(':core')
     testCompile project(':core').sourceSets.test.output
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
   }
 
   javadoc {
@@ -1763,8 +1770,8 @@ project(':connect:runtime') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1834,7 +1841,7 @@ project(':connect:file') {
     testCompile libs.powermockJunit4
     testCompile libs.powermockEasymock
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
     testCompile project(':clients').sourceSets.test.output
   }
 
@@ -1844,8 +1851,8 @@ project(':connect:file') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1874,7 +1881,7 @@ project(':connect:basic-auth-extension') {
     testCompile libs.powermockEasymock
     testCompile project(':clients').sourceSets.test.output
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
     testRuntime libs.jerseyContainerServlet
   }
 
@@ -1884,8 +1891,8 @@ project(':connect:basic-auth-extension') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1919,7 +1926,7 @@ project(':connect:mirror') {
     testCompile project(':core').sourceSets.test.output
 
     testRuntime project(':connect:runtime')
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
   }
 
   javadoc {
@@ -1928,8 +1935,8 @@ project(':connect:mirror') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')
@@ -1954,7 +1961,7 @@ project(':connect:mirror-client') {
     testCompile libs.junit
     testCompile project(':clients').sourceSets.test.output
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
   }
 
   javadoc {
@@ -1963,8 +1970,8 @@ project(':connect:mirror-client') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntime) {
-      include('slf4j-log4j12*')
-      include('log4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtime) {
       exclude('kafka-clients*')

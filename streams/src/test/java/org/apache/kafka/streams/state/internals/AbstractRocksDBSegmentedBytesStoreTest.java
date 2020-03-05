@@ -32,9 +32,9 @@ import org.apache.kafka.streams.kstream.Windowed;
 import org.apache.kafka.streams.kstream.internals.SessionWindow;
 import org.apache.kafka.streams.processor.internals.MockStreamsMetrics;
 import org.apache.kafka.streams.processor.internals.Task.TaskType;
-import org.apache.kafka.streams.processor.internals.testutil.LogCaptureAppender;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.StateSerdes;
+import org.apache.kafka.test.LogCaptureContext;
 import org.apache.kafka.test.InternalMockProcessorContext;
 import org.apache.kafka.test.MockRecordCollector;
 import org.apache.kafka.test.StreamsTestUtils;
@@ -396,18 +396,21 @@ public abstract class AbstractRocksDBSegmentedBytesStoreTest<S extends Segment> 
     }
 
     private void shouldLogAndMeasureExpiredRecords(final String builtInMetricsVersion) {
-        final Properties streamsConfig = StreamsTestUtils.getStreamsConfig();
-        streamsConfig.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
-        final AbstractRocksDBSegmentedBytesStore<S> bytesStore = getBytesStore();
-        final InternalMockProcessorContext context = new InternalMockProcessorContext(
-            TestUtils.tempDirectory(),
-            new StreamsConfig(streamsConfig)
-        );
-        final Time time = new SystemTime();
-        context.setSystemTimeMs(time.milliseconds());
-        bytesStore.init(context, bytesStore);
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
+                + "#shouldLogAndMeasureExpiredRecords:" + builtInMetricsVersion)) {
+            logCaptureContext.setLatch(2);
 
-        try (final LogCaptureAppender appender = LogCaptureAppender.createAndRegister()) {
+            final Properties streamsConfig = StreamsTestUtils.getStreamsConfig();
+            streamsConfig.setProperty(StreamsConfig.BUILT_IN_METRICS_VERSION_CONFIG, builtInMetricsVersion);
+            final AbstractRocksDBSegmentedBytesStore<S> bytesStore = getBytesStore();
+            final InternalMockProcessorContext context = new InternalMockProcessorContext(
+                TestUtils.tempDirectory(),
+                new StreamsConfig(streamsConfig)
+            );
+            final Time time = new SystemTime();
+            context.setSystemTimeMs(time.milliseconds());
+            bytesStore.init(context, bytesStore);
+
             // write a record to advance stream time, with a high enough timestamp
             // that the subsequent record in windows[0] will already be expired.
             bytesStore.put(serializeKey(new Windowed<>("dummy", nextSegmentWindow)), serializeValue(0));
@@ -416,59 +419,58 @@ public abstract class AbstractRocksDBSegmentedBytesStoreTest<S extends Segment> 
             final byte[] value = serializeValue(5);
             bytesStore.put(key, value);
 
-            final List<String> messages = appender.getMessages();
-            assertThat(messages, hasItem("Skipping record for expired segment."));
+            final Map<MetricName, ? extends Metric> metrics = context.metrics().metrics();
+            final String threadId = Thread.currentThread().getName();
+            final Metric dropTotal;
+            final Metric dropRate;
+            if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
+                dropTotal = metrics.get(new MetricName(
+                    "expired-window-record-drop-total",
+                    "stream-metrics-scope-metrics",
+                    "The total number of dropped records due to an expired window",
+                    mkMap(
+                        mkEntry("client-id", threadId),
+                        mkEntry("task-id", "0_0"),
+                        mkEntry("metrics-scope-state-id", "bytes-store")
+                    )
+                ));
+
+                dropRate = metrics.get(new MetricName(
+                    "expired-window-record-drop-rate",
+                    "stream-metrics-scope-metrics",
+                    "The average number of dropped records due to an expired window per second.",
+                    mkMap(
+                        mkEntry("client-id", threadId),
+                        mkEntry("task-id", "0_0"),
+                        mkEntry("metrics-scope-state-id", "bytes-store")
+                    )
+                ));
+            } else {
+                dropTotal = metrics.get(new MetricName(
+                    "dropped-records-total",
+                    "stream-task-metrics",
+                    "",
+                    mkMap(
+                        mkEntry("thread-id", threadId),
+                        mkEntry("task-id", "0_0")
+                    )
+                ));
+
+                dropRate = metrics.get(new MetricName(
+                    "dropped-records-rate",
+                    "stream-task-metrics",
+                    "",
+                    mkMap(
+                        mkEntry("thread-id", threadId),
+                        mkEntry("task-id", "0_0")
+                    )
+                ));
+            }
+            assertEquals(1.0, dropTotal.metricValue());
+            assertNotEquals(0.0, dropRate.metricValue());
+            final List<String> messages = logCaptureContext.getMessages();
+            assertThat(messages, hasItem("WARN Skipping record for expired segment. "));
         }
-
-        final Map<MetricName, ? extends Metric> metrics = context.metrics().metrics();
-        final String threadId = Thread.currentThread().getName();
-        final Metric dropTotal;
-        final Metric dropRate;
-        if (StreamsConfig.METRICS_0100_TO_24.equals(builtInMetricsVersion)) {
-            dropTotal = metrics.get(new MetricName(
-                "expired-window-record-drop-total",
-                "stream-metrics-scope-metrics",
-                "The total number of dropped records due to an expired window",
-                mkMap(
-                    mkEntry("client-id", threadId),
-                    mkEntry("task-id", "0_0"),
-                    mkEntry("metrics-scope-state-id", "bytes-store")
-                )
-            ));
-
-            dropRate = metrics.get(new MetricName(
-                "expired-window-record-drop-rate",
-                "stream-metrics-scope-metrics",
-                "The average number of dropped records due to an expired window per second.",
-                mkMap(
-                    mkEntry("client-id", threadId),
-                    mkEntry("task-id", "0_0"),
-                    mkEntry("metrics-scope-state-id", "bytes-store")
-                )
-            ));
-        } else {
-            dropTotal = metrics.get(new MetricName(
-                "dropped-records-total",
-                "stream-task-metrics",
-                "",
-                mkMap(
-                    mkEntry("thread-id", threadId),
-                    mkEntry("task-id", "0_0")
-                )
-            ));
-
-            dropRate = metrics.get(new MetricName(
-                "dropped-records-rate",
-                "stream-task-metrics",
-                "",
-                mkMap(
-                    mkEntry("thread-id", threadId),
-                    mkEntry("task-id", "0_0")
-                )
-            ));
-        }
-        assertEquals(1.0, dropTotal.metricValue());
-        assertNotEquals(0.0, dropRate.metricValue());
     }
 
     private Set<String> segmentDirs() {

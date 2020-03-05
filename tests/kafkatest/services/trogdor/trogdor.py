@@ -142,7 +142,7 @@ class TrogdorService(KafkaPathResolverMixin, Service):
 
     def _start_coordinator_node(self, node):
         node.account.create_file(TrogdorService.COORDINATOR_LOG4J_PROPERTIES,
-                                 self.render('log4j.properties',
+                                 self.render('log4j2.properties',
                                              log_path=TrogdorService.COORDINATOR_LOG))
         self._start_trogdor_daemon("coordinator", TrogdorService.COORDINATOR_STDOUT_STDERR,
                                    TrogdorService.COORDINATOR_LOG4J_PROPERTIES,
@@ -151,7 +151,7 @@ class TrogdorService(KafkaPathResolverMixin, Service):
 
     def _start_agent_node(self, node):
         node.account.create_file(TrogdorService.AGENT_LOG4J_PROPERTIES,
-                                 self.render('log4j.properties',
+                                 self.render('log4j2.properties',
                                              log_path=TrogdorService.AGENT_LOG))
         self._start_trogdor_daemon("agent", TrogdorService.AGENT_STDOUT_STDERR,
                                    TrogdorService.AGENT_LOG4J_PROPERTIES,
@@ -160,7 +160,7 @@ class TrogdorService(KafkaPathResolverMixin, Service):
 
     def _start_trogdor_daemon(self, daemon_name, stdout_stderr_capture_path,
                               log4j_properties_path, log_path, node):
-        cmd = "export KAFKA_LOG4J_OPTS='-Dlog4j.configuration=file:%s'; " % log4j_properties_path
+        cmd = "export KAFKA_LOG4J_OPTS='-Dlog4j.configurationFile=file:%s'; " % log4j_properties_path
         cmd += "%s %s --%s.config %s --node-name %s 1>> %s 2>> %s &" % \
                (self.path.script("trogdor.sh", node),
                 daemon_name,
