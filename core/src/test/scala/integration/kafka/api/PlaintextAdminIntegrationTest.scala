@@ -1922,7 +1922,7 @@ class PlaintextAdminIntegrationTest extends BaseAdminIntegrationTest {
     assertEquals(2, configs.size)
 
     assertEquals(Defaults.LogCleanerMinCleanRatio.toString, configs.get(topic1Resource).get(LogConfig.MinCleanableDirtyRatioProp).value)
-    assertEquals(Defaults.CompressionType.toString, configs.get(topic1Resource).get(LogConfig.CompressionTypeProp).value)
+    assertEquals(Defaults.CompressionType, configs.get(topic1Resource).get(LogConfig.CompressionTypeProp).value)
     assertEquals("0.9", configs.get(topic2Resource).get(LogConfig.MinCleanableDirtyRatioProp).value)
 
     //check invalid use of append/subtract operation types
@@ -2148,7 +2148,7 @@ class PlaintextAdminIntegrationTest extends BaseAdminIntegrationTest {
     * 2. Change kafka.controller.KafkaController logger to INFO
     * 3. Unset kafka.controller.KafkaController via AlterConfigOp.OpType.DELETE (resets it to the root logger - TRACE)
     * 4. Change ROOT logger to ERROR
-    * 5. Ensure the kafka.controller.KafkaController logger's level is ERROR (the curent root logger level)
+    * 5. Ensure the kafka.controller.KafkaController logger's level is ERROR (the current root logger level)
     */
   @Test
   @Ignore // To be re-enabled once KAFKA-8779 is resolved
