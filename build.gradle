@@ -1320,11 +1320,15 @@ project(':tools') {
 
   dependencies {
     compile project(':clients')
-    compile project(':log4j-appender')
     compile libs.argparse4j
     compile libs.jacksonDatabind
     compile libs.jacksonJDK8Datatypes
     compile libs.slf4jApi
+    compile libs.log4j2Api
+    compile libs.log4j1_2Api
+    compile (libs.log4j2Core) {
+      exclude(group: 'org.apache.kafka', module: 'kafka-clients')
+    }
 
     compile libs.jacksonJaxrsJsonProvider
     compile libs.jerseyContainerServlet
@@ -1338,9 +1342,7 @@ project(':tools') {
     testCompile project(':clients')
     testCompile libs.junitJupiter
     testCompile project(':clients').sourceSets.test.output
-    testCompile libs.mockitoInline // supports mocking static methods, final classes, etc.
-
-    testRuntime libs.slf4jlog4j2
+    testRuntime libs.slf4jlog4j
   }
 
   javadoc {
@@ -1352,9 +1354,7 @@ project(':tools') {
       include('log4j-slf4j-impl*')
       include('log4j-[api|core]*jar')
     }
-    from (configurations.runtime) {
-      exclude('kafka-clients*')
-    }
+    from (configurations.runtimeClasspath)
     into "$buildDir/dependant-libs-${versions.scala}"
     duplicatesStrategy 'exclude'
   }
@@ -1375,16 +1375,20 @@ project(':shell') {
     compile libs.slf4jApi
     compile project(':clients')
     compile project(':core')
-    compile project(':log4j-appender')
     compile project(':metadata')
     compile project(':raft')
+    compile libs.log4j2Api
+    compile libs.log4j1_2Api
+    compile (libs.log4j2Core) {
+      exclude(group: 'org.apache.kafka', module: 'kafka-clients')
+    }
 
     compile libs.jacksonJaxrsJsonProvider
 
     testCompile project(':clients')
     testCompile libs.junitJupiter
 
-    testRuntime libs.slf4jlog4j
+    testRuntime libs.slf4jlog4j2
   }
 
   javadoc {

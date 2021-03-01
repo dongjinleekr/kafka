@@ -30,7 +30,7 @@ class EndToEndLatencyService(PerformanceService):
     STDOUT_CAPTURE = os.path.join(PERSISTENT_ROOT, "end_to_end_latency.stdout")
     STDERR_CAPTURE = os.path.join(PERSISTENT_ROOT, "end_to_end_latency.stderr")
     LOG_FILE = os.path.join(LOG_DIR, "end_to_end_latency.log")
-    LOG4J_CONFIG = os.path.join(PERSISTENT_ROOT, "tools-log4j.properties")
+    LOG4J_CONFIG = os.path.join(PERSISTENT_ROOT, "tools-log4j2.properties")
     CONFIG_FILE = os.path.join(PERSISTENT_ROOT, "client.properties")
 
     logs = {

@@ -55,7 +55,7 @@ class ConsumerPerformanceService(PerformanceService):
     STDOUT_CAPTURE = os.path.join(PERSISTENT_ROOT, "consumer_performance.stdout")
     STDERR_CAPTURE = os.path.join(PERSISTENT_ROOT, "consumer_performance.stderr")
     LOG_FILE = os.path.join(LOG_DIR, "consumer_performance.log")
-    LOG4J_CONFIG = os.path.join(PERSISTENT_ROOT, "tools-log4j.properties")
+    LOG4J_CONFIG = os.path.join(PERSISTENT_ROOT, "tools-log4j2.properties")
     CONFIG_FILE = os.path.join(PERSISTENT_ROOT, "consumer.properties")
 
     logs = {
