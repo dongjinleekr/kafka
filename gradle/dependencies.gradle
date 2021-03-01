@@ -172,7 +172,7 @@ libs += [
   kafkaStreams_26: "org.apache.kafka:kafka-streams:$versions.kafka_26",
   kafkaStreams_27: "org.apache.kafka:kafka-streams:$versions.kafka_27",
   kafkaStreams_28: "org.apache.kafka:kafka-streams:$versions.kafka_28",
-  log4j: "log4j:log4j:$versions.log4j",
+  log4j: "ch.qos.reload4j:reload4j:$versions.reload4j",
   log4j1_2Api: "org.apache.logging.log4j:log4j-1.2-api:$versions.log4j2",
   log4j2Api: "org.apache.logging.log4j:log4j-api:$versions.log4j2",
   log4j2Core: "org.apache.logging.log4j:log4j-core:$versions.log4j2",
