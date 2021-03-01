@@ -346,7 +346,7 @@
     <allow pkg="com.fasterxml.jackson" />
     <allow pkg="org.jose4j" />
     <allow pkg="net.sourceforge.argparse4j" />
-    <allow pkg="org.apache.log4j" />
+    <allow pkg="org.apache.logging.log4j" />
   </subpackage>
 
   <subpackage name="trogdor">
