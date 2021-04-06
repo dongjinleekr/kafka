@@ -25,6 +25,8 @@ if [ "x$KAFKA_HEAP_OPTS" = "x" ]; then
     export KAFKA_HEAP_OPTS="-Xmx1G -Xms1G"
 fi
 
+export USE_LOG4J2_JAR=true
+
 EXTRA_ARGS=${EXTRA_ARGS-'-name kafkaServer -loggc'}
 
 COMMAND=$1
