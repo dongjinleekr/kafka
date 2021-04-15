@@ -210,6 +210,35 @@ public class CachingKeyValueStore
     }
 
     @Override
+    public synchronized KeyValueIterator<Bytes, byte[]> deleteRange(final Bytes from,
+                                                                    final Bytes to) {
+        if (from.compareTo(to) > 0) {
+            LOG.warn("Returning empty iterator for fetch with invalid key range: from > to. " +
+                "This may be due to range arguments set in the wrong order, " +
+                "or serdes that don't preserve ordering when lexicographically comparing the serialized bytes. " +
+                "Note that the built-in numerical serdes do not follow this for negative numbers");
+            return KeyValueIterators.emptyIterator();
+        }
+
+        validateStoreOpen();
+        final KeyValueIterator<Bytes, byte[]> storeIterator = wrapped().deleteRange(from, to);
+
+        lock.writeLock().lock();
+        try {
+            validateStoreOpen();
+            final ThreadCache.MemoryLRUCacheBytesIterator cacheIterator = context.cache().range(cacheName, from, to);
+
+            while (cacheIterator.hasNext()) {
+                deleteInternal(cacheIterator.next().key);
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+
+        return storeIterator;
+    }
+
+    @Override
     public byte[] get(final Bytes key) {
         Objects.requireNonNull(key, "key cannot be null");
         validateStoreOpen();

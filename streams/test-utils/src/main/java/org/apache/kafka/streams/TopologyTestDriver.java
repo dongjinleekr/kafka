@@ -47,6 +47,7 @@ import org.apache.kafka.streams.processor.StateStoreContext;
 import org.apache.kafka.streams.processor.internals.StreamsProducer;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.WindowStoreIterator;
+import org.apache.kafka.streams.state.internals.KeyValueIteratorFacade;
 import org.apache.kafka.streams.state.internals.ReadOnlyKeyValueStoreFacade;
 import org.apache.kafka.streams.state.internals.ReadOnlyWindowStoreFacade;
 import org.apache.kafka.streams.processor.ProcessorContext;
@@ -1314,6 +1315,13 @@ public class TopologyTestDriver implements Closeable {
         @Override
         public V delete(final K key) {
             return getValueOrNull(inner.delete(key));
+        }
+
+        @Override
+        public KeyValueIterator<K, V> deleteRange(final K from, final K to) {
+            final KeyValueIterator<K, ValueAndTimestamp<V>> innerIter = inner.deleteRange(from, to);
+
+            return new KeyValueIteratorFacade<>(innerIter);
         }
 
         @Override

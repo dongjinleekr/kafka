@@ -17,6 +17,7 @@
 package org.apache.kafka.streams.state;
 
 import org.apache.kafka.streams.KeyValue;
+import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.processor.StateStore;
 
 import java.util.List;
@@ -67,4 +68,18 @@ public interface KeyValueStore<K, V> extends StateStore, ReadOnlyKeyValueStore<K
      * @throws NullPointerException If {@code null} is used for key.
      */
     V delete(K key);
+
+    /**
+     * Delete the values over a given range of keys from the store (if there is one). This iterator must be closed after use.
+     * The returned iterator must be safe from {@link java.util.ConcurrentModificationException}s
+     * and must not return null values.
+     * Order is not guaranteed as bytes lexicographical ordering might not represent key order.
+     *
+     * @param from The first key that could be in the range, where iteration starts from.
+     * @param to   The last key that could be in the range, where iteration ends.
+     * @return The iterator of the old values for this range, from smallest to largest bytes.
+     * @throws NullPointerException       If null is used for from or to.
+     * @throws InvalidStateStoreException if the store is not initialized
+     */
+    KeyValueIterator<K, V> deleteRange(final K from, final K to);
 }

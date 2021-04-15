@@ -126,6 +126,18 @@ public class GenericInMemoryTimestampedKeyValueStore<K extends Comparable, V>
     }
 
     @Override
+    public synchronized KeyValueIterator<K, ValueAndTimestamp<V>> deleteRange(final K from,
+                                                                              final K to) {
+        final KeyValueIterator<K, ValueAndTimestamp<V>> iter = range(from, to);
+
+        while (iter.hasNext()) {
+            delete(iter.next().key);
+        }
+
+        return iter;
+    }
+
+    @Override
     public synchronized KeyValueIterator<K, ValueAndTimestamp<V>> range(final K from,
         final K to) {
         return new DelegatingPeekingKeyValueIterator<>(

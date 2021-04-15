@@ -146,6 +146,12 @@ public class MemoryLRUCache implements KeyValueStore<Bytes, byte[]> {
         return this.map.remove(key);
     }
 
+    @Override
+    public synchronized KeyValueIterator<Bytes, byte[]> deleteRange(final Bytes from,
+                                                                    final Bytes to) {
+        throw new UnsupportedOperationException("MemoryLRUCache does not support deleteRange() function.");
+    }
+
     /**
      * @throws UnsupportedOperationException at every invocation
      */

@@ -233,6 +233,16 @@ public class MeteredKeyValueStore<K, V>
     }
 
     @Override
+    public synchronized KeyValueIterator<K, V> deleteRange(final K from, final K to) {
+        try {
+            return new MeteredKeyValueIterator(wrapped().deleteRange(keyBytes(from), keyBytes(to)), deleteSensor);
+        } catch (final ProcessorStateException e) {
+            final String message = String.format(e.getMessage(), from);
+            throw new ProcessorStateException(message, e);
+        }
+    }
+
+    @Override
     public <PS extends Serializer<P>, P> KeyValueIterator<K, V> prefixScan(final P prefix, final PS prefixKeySerializer) {
 
         return new MeteredKeyValueIterator(wrapped().prefixScan(prefix, prefixKeySerializer), prefixScanSensor);

@@ -127,6 +127,18 @@ public class InMemoryKeyValueStore implements KeyValueStore<Bytes, byte[]> {
     }
 
     @Override
+    public synchronized KeyValueIterator<Bytes, byte[]> deleteRange(final Bytes from,
+                                                                    final Bytes to) {
+        final KeyValueIterator<Bytes, byte[]> oldValuesIter = range(from, to);
+
+        while (oldValuesIter.hasNext()) {
+            delete(oldValuesIter.next().key);
+        }
+
+        return oldValuesIter;
+    }
+
+    @Override
     public synchronized KeyValueIterator<Bytes, byte[]> range(final Bytes from, final Bytes to) {
         return range(from, to, true);
     }

@@ -78,6 +78,11 @@ public class KeyValueToTimestampedKeyValueByteStoreAdapter implements KeyValueSt
     }
 
     @Override
+    public KeyValueIterator<Bytes, byte[]> deleteRange(final Bytes from, final Bytes to) {
+        return new KeyValueToTimestampedKeyValueIteratorAdapter<>(store.deleteRange(from, to));
+    }
+
+    @Override
     public String name() {
         return store.name();
     }

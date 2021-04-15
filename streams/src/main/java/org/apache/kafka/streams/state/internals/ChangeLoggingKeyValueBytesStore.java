@@ -112,6 +112,12 @@ public class ChangeLoggingKeyValueBytesStore
     }
 
     @Override
+    public synchronized KeyValueIterator<Bytes, byte[]> deleteRange(final Bytes from,
+                                                                    final Bytes to) {
+        return wrapped().deleteRange(from, to);
+    }
+
+    @Override
     public byte[] get(final Bytes key) {
         return wrapped().get(key);
     }

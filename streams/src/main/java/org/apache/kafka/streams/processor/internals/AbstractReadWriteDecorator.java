@@ -135,6 +135,11 @@ abstract class AbstractReadWriteDecorator<T extends StateStore, K, V> extends Wr
         public V delete(final K key) {
             return wrapped().delete(key);
         }
+
+        @Override
+        public KeyValueIterator<K, V> deleteRange(final K from, final K to) {
+            return wrapped().deleteRange(from, to);
+        }
     }
 
     static class TimestampedKeyValueStoreReadWriteDecorator<K, V>

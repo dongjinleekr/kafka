@@ -141,6 +141,11 @@ abstract class AbstractReadOnlyDecorator<T extends StateStore, K, V> extends Wra
         public V delete(final K key) {
             throw new UnsupportedOperationException(ERROR_MESSAGE);
         }
+
+        @Override
+        public KeyValueIterator<K, V> deleteRange(final K from, final K to) {
+            throw new UnsupportedOperationException(ERROR_MESSAGE);
+        }
     }
 
     static class TimestampedKeyValueStoreReadOnlyDecorator<K, V>

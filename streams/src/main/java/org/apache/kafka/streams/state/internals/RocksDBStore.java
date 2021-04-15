@@ -350,6 +350,18 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BatchWritingS
     }
 
     @Override
+    public synchronized KeyValueIterator<Bytes, byte[]> deleteRange(final Bytes from,
+                                                                    final Bytes to) {
+        Objects.requireNonNull(from, "from cannot be null");
+        Objects.requireNonNull(to, "to cannot be null");
+
+        validateStoreOpen();
+        final KeyValueIterator<Bytes, byte[]> oldValuesIter = range(from, to);
+        dbAccessor.deleteRange(from.get(), to.get());
+        return oldValuesIter;
+    }
+
+    @Override
     public synchronized KeyValueIterator<Bytes, byte[]> range(final Bytes from,
                                                               final Bytes to) {
         return range(from, to, true);
@@ -520,6 +532,9 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BatchWritingS
          */
         byte[] getOnly(final byte[] key) throws RocksDBException;
 
+        void deleteRange(final byte[] from,
+                         final byte[] to);
+
         KeyValueIterator<Bytes, byte[]> range(final Bytes from,
                                               final Bytes to,
                                               final boolean forward);
@@ -586,6 +601,17 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BatchWritingS
         @Override
         public byte[] getOnly(final byte[] key) throws RocksDBException {
             return db.get(columnFamily, key);
+        }
+
+        @Override
+        public void deleteRange(final byte[] from,
+                                final byte[] to) {
+            try {
+                db.deleteRange(columnFamily, wOptions, from, to);
+            } catch (final RocksDBException e) {
+                // String format is happening in wrapping stores. So formatted message is thrown from wrapping stores.
+                throw new ProcessorStateException("Error while removing key from store " + name, e);
+            }
         }
 
         @Override

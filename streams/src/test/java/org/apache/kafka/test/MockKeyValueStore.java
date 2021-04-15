@@ -113,6 +113,11 @@ public class MockKeyValueStore implements KeyValueStore<Object, Object> {
     }
 
     @Override
+    public KeyValueIterator<Object, Object> deleteRange(final Object from, final Object to) {
+        return null;
+    }
+
+    @Override
     public void putAll(final List<KeyValue<Object, Object>> entries) {}
 
     @Override
