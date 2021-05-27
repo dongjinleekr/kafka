@@ -90,7 +90,7 @@ class ProduceRequestTest extends BaseRequestTest {
 
     def createRecords(magicValue: Byte, timestamp: Long, codec: CompressionType): MemoryRecords = {
       val buf = ByteBuffer.allocate(512)
-      val builder = MemoryRecords.builder(buf, magicValue, codec, TimestampType.CREATE_TIME, 0L)
+      val builder = MemoryRecords.builder(buf, magicValue, CompressionConfig.of(codec), TimestampType.CREATE_TIME, 0L)
       builder.appendWithOffset(0, timestamp, null, "hello".getBytes)
       builder.appendWithOffset(1, timestamp, null, "there".getBytes)
       builder.appendWithOffset(2, timestamp, null, "beautiful".getBytes)

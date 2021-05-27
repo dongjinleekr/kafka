@@ -1386,22 +1386,22 @@ class LogTest {
     val epoch: Short = 0
     val buffer = ByteBuffer.allocate(512)
 
-    var builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionType.NONE,
+    var builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 0L, mockTime.milliseconds(), 1L, epoch, 0, false, 0)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
 
-    builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionType.NONE,
+    builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 1L, mockTime.milliseconds(), 2L, epoch, 0, false, 0)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
 
-    builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionType.NONE,
+    builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 2L, mockTime.milliseconds(), 3L, epoch, 0, false, 0)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
 
-    builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionType.NONE,
+    builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 3L, mockTime.milliseconds(), 4L, epoch, 0, false, 0)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
@@ -1457,31 +1457,31 @@ class LogTest {
     val buffer = ByteBuffer.allocate(512)
 
     // pid1 seq = 0
-    var builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionType.NONE,
+    var builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 0L, mockTime.milliseconds(), pid1, epoch, 0)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
 
     // pid2 seq = 0
-    builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionType.NONE,
+    builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 1L, mockTime.milliseconds(), pid2, epoch, 0)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
 
     // pid1 seq = 1
-    builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionType.NONE,
+    builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 2L, mockTime.milliseconds(), pid1, epoch, 1)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
 
     // pid2 seq = 1
-    builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionType.NONE,
+    builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 3L, mockTime.milliseconds(), pid2, epoch, 1)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
 
     // // pid1 seq = 1 (duplicate)
-    builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionType.NONE,
+    builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionConfig.none(),
       TimestampType.LOG_APPEND_TIME, 4L, mockTime.milliseconds(), pid1, epoch, 1)
     builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
     builder.close()
@@ -2236,7 +2236,7 @@ class LogTest {
     val appendOffsets = Seq(0L, 1L, 3L, 2L, 4L)
     val buffer = ByteBuffer.allocate(512)
     for (offset <- appendOffsets) {
-      val builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionType.NONE,
+      val builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionConfig.none(),
                                           TimestampType.LOG_APPEND_TIME, offset, mockTime.milliseconds(),
                                           1L, 0, 0, false, 0)
       builder.append(new SimpleRecord("key".getBytes, "value".getBytes))
@@ -2259,7 +2259,7 @@ class LogTest {
     val magicVals = Seq(RecordBatch.MAGIC_VALUE_V0, RecordBatch.MAGIC_VALUE_V1, RecordBatch.MAGIC_VALUE_V2)
     val compressionTypes = Seq(CompressionType.NONE, CompressionType.LZ4)
     for (magic <- magicVals; compression <- compressionTypes) {
-      val invalidRecord = MemoryRecords.withRecords(magic, compression, new SimpleRecord(1.toString.getBytes))
+      val invalidRecord = MemoryRecords.withRecords(magic, CompressionConfig.of(compression), new SimpleRecord(1.toString.getBytes))
       assertThrows(classOf[UnexpectedAppendOffsetException],
         () => log.appendAsFollower(invalidRecord),
         () => s"Magic=$magic, compressionType=$compression")
@@ -3479,7 +3479,7 @@ class LogTest {
                                           leaderEpoch: Int = 0): (Long, Int) => Unit = {
     var sequence = 0
     (offset: Long, numRecords: Int) => {
-      val builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionType.NONE, TimestampType.CREATE_TIME,
+      val builder = MemoryRecords.builder(buffer, RecordBatch.CURRENT_MAGIC_VALUE, CompressionConfig.none(), TimestampType.CREATE_TIME,
         offset, mockTime.milliseconds(), producerId, producerEpoch, sequence, true, leaderEpoch)
       for (seq <- sequence until sequence + numRecords) {
         val record = new SimpleRecord(s"$seq".getBytes)
@@ -3503,7 +3503,7 @@ class LogTest {
   }
 
   private def appendNonTransactionalToBuffer(buffer: ByteBuffer, offset: Long, numRecords: Int): Unit = {
-    val builder = MemoryRecords.builder(buffer, CompressionType.NONE, TimestampType.CREATE_TIME, offset)
+    val builder = MemoryRecords.builder(buffer, CompressionConfig.none(), TimestampType.CREATE_TIME, offset)
     (0 until numRecords).foreach { seq =>
       builder.append(new SimpleRecord(s"$seq".getBytes))
     }

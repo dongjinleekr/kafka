@@ -22,6 +22,12 @@ import org.apache.kafka.clients.NodeApiVersions;
 import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.errors.FencedInstanceIdException;
+import org.apache.kafka.common.message.ApiVersionsResponseData.ApiVersion;
+import org.apache.kafka.common.record.CompressionConfig;
+import org.apache.kafka.common.requests.JoinGroupRequest;
+import org.apache.kafka.common.requests.RequestTestUtils;
+import org.apache.kafka.common.utils.ProducerIdAndEpoch;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
@@ -46,7 +52,6 @@ import org.apache.kafka.common.message.InitProducerIdResponseData;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
-import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.MemoryRecordsBuilder;
 import org.apache.kafka.common.record.MutableRecordBatch;
@@ -170,7 +175,7 @@ public class TransactionManagerTest {
         String metricGrpName = "producer-metrics";
 
         this.brokerNode = new Node(0, "localhost", 2211);
-        this.accumulator = new RecordAccumulator(logContext, batchSize, CompressionType.NONE, 0, 0L,
+        this.accumulator = new RecordAccumulator(logContext, batchSize, CompressionConfig.none(), 0, 0L,
                 deliveryTimeoutMs, metrics, metricGrpName, time, apiVersions, transactionManager,
                 new BufferPool(totalSize, batchSize, metrics, time, metricGrpName));
 
@@ -706,7 +711,7 @@ public class TransactionManagerTest {
 
     private ProducerBatch batchWithValue(TopicPartition tp, String value) {
         MemoryRecordsBuilder builder = MemoryRecords.builder(ByteBuffer.allocate(64),
-                CompressionType.NONE, TimestampType.CREATE_TIME, 0L);
+            CompressionConfig.none(), TimestampType.CREATE_TIME, 0L);
         long currentTimeMs = time.milliseconds();
         ProducerBatch batch = new ProducerBatch(tp, builder, currentTimeMs);
         batch.tryAppend(currentTimeMs, new byte[0], value.getBytes(), new Header[0], null, currentTimeMs);
