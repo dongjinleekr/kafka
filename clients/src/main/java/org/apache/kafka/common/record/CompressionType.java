@@ -30,6 +30,7 @@ import java.io.BufferedOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -46,6 +47,11 @@ public enum CompressionType {
         public InputStream wrapForInput(ByteBuffer buffer, byte messageVersion, BufferSupplier decompressionBufferSupplier) {
             return new ByteBufferInputStream(buffer);
         }
+
+        @Override
+        public boolean isValidLevel(int level) {
+            return false;
+        }
     },
 
     // Shipped with the JDK
@@ -56,7 +62,7 @@ public enum CompressionType {
                 // Set input buffer (uncompressed) to 16 KB (none by default) and output buffer (compressed) to
                 // 8 KB (0.5 KB by default) to ensure reasonable performance in cases where the caller passes a small
                 // number of bytes to write (potentially a single byte)
-                return new BufferedOutputStream(GZipOutputStream.of(buffer, null), 16 * 1024);
+                return new BufferedOutputStream(GZipOutputStream.of(buffer, level), 16 * 1024);
             } catch (Exception e) {
                 throw new KafkaException(e);
             }
@@ -73,6 +79,11 @@ public enum CompressionType {
             } catch (Exception e) {
                 throw new KafkaException(e);
             }
+        }
+
+        @Override
+        public boolean isValidLevel(int level) {
+            return Deflater.BEST_SPEED <= level && level <= Deflater.BEST_COMPRESSION;
         }
     },
 
@@ -92,13 +103,18 @@ public enum CompressionType {
         public InputStream wrapForInput(ByteBuffer buffer, byte messageVersion, BufferSupplier decompressionBufferSupplier) {
             return SnappyFactory.wrapForInput(buffer);
         }
+
+        @Override
+        public boolean isValidLevel(int level) {
+            return false;
+        }
     },
 
     LZ4(3, "lz4", 1.0f) {
         @Override
         public OutputStream wrapForOutput(ByteBufferOutputStream buffer, byte messageVersion, Integer level) {
             try {
-                return new KafkaLZ4BlockOutputStream(buffer, null, messageVersion == RecordBatch.MAGIC_VALUE_V0);
+                return new KafkaLZ4BlockOutputStream(buffer, level, messageVersion == RecordBatch.MAGIC_VALUE_V0);
             } catch (Throwable e) {
                 throw new KafkaException(e);
             }
@@ -113,17 +129,27 @@ public enum CompressionType {
                 throw new KafkaException(e);
             }
         }
+
+        @Override
+        public boolean isValidLevel(int level) {
+            return 1 <= level && level <= 17;
+        }
     },
 
     ZSTD(4, "zstd", 1.0f) {
         @Override
         public OutputStream wrapForOutput(ByteBufferOutputStream buffer, byte messageVersion, Integer level) {
-            return ZstdFactory.wrapForOutput(buffer, null);
+            return ZstdFactory.wrapForOutput(buffer, level);
         }
 
         @Override
         public InputStream wrapForInput(ByteBuffer buffer, byte messageVersion, BufferSupplier decompressionBufferSupplier) {
             return ZstdFactory.wrapForInput(buffer, messageVersion, decompressionBufferSupplier);
+        }
+
+        @Override
+        public boolean isValidLevel(int level) {
+            return ZstdFactory.minCompressionLevel() <= level && level <= ZstdFactory.maxCompressionLevel();
         }
     };
 
@@ -157,6 +183,8 @@ public enum CompressionType {
      *                                    performance impact.
      */
     public abstract InputStream wrapForInput(ByteBuffer buffer, byte messageVersion, BufferSupplier decompressionBufferSupplier);
+
+    public abstract boolean isValidLevel(int level);
 
     public static CompressionType forId(int id) {
         switch (id) {

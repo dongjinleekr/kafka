@@ -26,17 +26,28 @@ import java.util.Objects;
 
 public class CompressionConfig {
     private final CompressionType type;
+    private final Integer level;
 
     public static CompressionConfig none() {
-        return new CompressionConfig(CompressionType.NONE);
+        return of(CompressionType.NONE);
     }
 
     public static CompressionConfig of(final CompressionType type) {
-        return new CompressionConfig(Objects.requireNonNull(type));
+        return of(Objects.requireNonNull(type), null);
     }
 
-    private CompressionConfig(final CompressionType type) {
+    public static CompressionConfig of(final CompressionType type, final Integer level) {
+        return new CompressionConfig(Objects.requireNonNull(type), level);
+    }
+
+    private CompressionConfig(final CompressionType type, final Integer level) {
         this.type = type;
+
+        if (level != null && !type.isValidLevel(level.intValue())) {
+            throw new IllegalArgumentException("Illegal level " + level + " for compression codec " + type.name);
+        }
+
+        this.level = level;
     }
 
     public CompressionType getType() {
@@ -47,7 +58,7 @@ public class CompressionConfig {
      * Wrap bufferStream with an OutputStream that will compress data with this CompressionConfig.
      */
     public OutputStream wrapForOutput(ByteBufferOutputStream bufferStream, byte messageVersion) {
-        return type.wrapForOutput(bufferStream, messageVersion, -1);
+        return type.wrapForOutput(bufferStream, messageVersion, level);
     }
 
     /**

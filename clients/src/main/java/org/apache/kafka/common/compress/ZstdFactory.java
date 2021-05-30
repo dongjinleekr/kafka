@@ -19,6 +19,7 @@ package org.apache.kafka.common.compress;
 
 import com.github.luben.zstd.BufferPool;
 import com.github.luben.zstd.RecyclingBufferPool;
+import com.github.luben.zstd.Zstd;
 import com.github.luben.zstd.ZstdInputStreamNoFinalizer;
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer;
 import org.apache.kafka.common.KafkaException;
@@ -35,6 +36,14 @@ import java.nio.ByteBuffer;
 public class ZstdFactory {
 
     private ZstdFactory() { }
+
+    public static int minCompressionLevel() {
+        return Zstd.minCompressionLevel();
+    }
+
+    public static int maxCompressionLevel() {
+        return Zstd.maxCompressionLevel();
+    }
 
     public static OutputStream wrapForOutput(ByteBufferOutputStream buffer, Integer level) {
         try {
