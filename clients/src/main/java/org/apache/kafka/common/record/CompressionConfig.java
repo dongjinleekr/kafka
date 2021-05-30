@@ -43,10 +43,16 @@ public class CompressionConfig {
         return type;
     }
 
+    /**
+     * Wrap bufferStream with an OutputStream that will compress data with this CompressionConfig.
+     */
     public OutputStream wrapForOutput(ByteBufferOutputStream bufferStream, byte messageVersion) {
-        return type.wrapForOutput(bufferStream, messageVersion);
+        return type.wrapForOutput(bufferStream, messageVersion, -1);
     }
 
+    /**
+     * Wrap buffer with an InputStream that will decompress data with this CompressionConfig.
+     */
     public InputStream wrapForInput(ByteBuffer buffer, byte messageVersion, BufferSupplier decompressionBufferSupplier) {
         return type.wrapForInput(buffer, messageVersion, decompressionBufferSupplier);
     }
