@@ -118,7 +118,7 @@ public enum CompressionType {
     ZSTD(4, "zstd", 1.0f) {
         @Override
         public OutputStream wrapForOutput(ByteBufferOutputStream buffer, byte messageVersion, Integer level) {
-            return ZstdFactory.wrapForOutput(buffer);
+            return ZstdFactory.wrapForOutput(buffer, null);
         }
 
         @Override

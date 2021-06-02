@@ -36,11 +36,15 @@ public class ZstdFactory {
 
     private ZstdFactory() { }
 
-    public static OutputStream wrapForOutput(ByteBufferOutputStream buffer) {
+    public static OutputStream wrapForOutput(ByteBufferOutputStream buffer, Integer level) {
         try {
             // Set input buffer (uncompressed) to 16 KB (none by default) to ensure reasonable performance
             // in cases where the caller passes a small number of bytes to write (potentially a single byte).
-            return new BufferedOutputStream(new ZstdOutputStreamNoFinalizer(buffer, RecyclingBufferPool.INSTANCE), 16 * 1024);
+            if (level == null) {
+                return new BufferedOutputStream(new ZstdOutputStreamNoFinalizer(buffer, RecyclingBufferPool.INSTANCE), 16 * 1024);
+            } else {
+                return new BufferedOutputStream(new ZstdOutputStreamNoFinalizer(buffer, RecyclingBufferPool.INSTANCE, level.intValue()), 16 * 1024);
+            }
         } catch (Throwable e) {
             throw new KafkaException(e);
         }
