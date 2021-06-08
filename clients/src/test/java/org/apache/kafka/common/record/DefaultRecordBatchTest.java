@@ -169,7 +169,7 @@ public class DefaultRecordBatchTest {
             new SimpleRecord(timestamp + 60000, "key".getBytes(), null),
             new SimpleRecord(timestamp + 60000, "key".getBytes(), "value".getBytes(), headers)
         };
-        int actualSize = MemoryRecords.withRecords(CompressionType.NONE, records).sizeInBytes();
+        int actualSize = MemoryRecords.withRecords(CompressionConfig.none(), records).sizeInBytes();
         assertEquals(actualSize, DefaultRecordBatch.sizeInBytes(Arrays.asList(records)));
     }
 

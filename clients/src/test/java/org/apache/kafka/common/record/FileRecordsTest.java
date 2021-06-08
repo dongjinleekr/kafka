@@ -116,7 +116,7 @@ public class FileRecordsTest {
     public void testFileSize() throws IOException {
         assertEquals(fileRecords.channel().size(), fileRecords.sizeInBytes());
         for (int i = 0; i < 20; i++) {
-            fileRecords.append(MemoryRecords.withRecords(CompressionType.NONE, new SimpleRecord("abcd".getBytes())));
+            fileRecords.append(MemoryRecords.withRecords(CompressionConfig.none(), new SimpleRecord("abcd".getBytes())));
             assertEquals(fileRecords.channel().size(), fileRecords.sizeInBytes());
         }
     }

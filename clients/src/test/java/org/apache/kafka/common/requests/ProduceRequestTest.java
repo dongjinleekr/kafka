@@ -247,7 +247,7 @@ public class ProduceRequestTest {
         final int sequence = 10;
         final String transactionalId = "txnlId";
 
-        final MemoryRecords nonTxnRecords = MemoryRecords.withRecords(CompressionType.NONE,
+        final MemoryRecords nonTxnRecords = MemoryRecords.withRecords(CompressionConfig.none(),
                 new SimpleRecord("foo".getBytes()));
         final MemoryRecords txnRecords = MemoryRecords.withTransactionalRecords(CompressionType.NONE, producerId,
                 producerEpoch, sequence, new SimpleRecord("bar".getBytes()));
@@ -273,7 +273,7 @@ public class ProduceRequestTest {
         final short producerEpoch = 5;
         final int sequence = 10;
 
-        final MemoryRecords nonTxnRecords = MemoryRecords.withRecords(CompressionType.NONE,
+        final MemoryRecords nonTxnRecords = MemoryRecords.withRecords(CompressionConfig.none(),
                 new SimpleRecord("foo".getBytes()));
         final MemoryRecords txnRecords = MemoryRecords.withIdempotentRecords(CompressionType.NONE, producerId,
                 producerEpoch, sequence, new SimpleRecord("bar".getBytes()));
@@ -307,7 +307,7 @@ public class ProduceRequestTest {
                                 .setName("topic")
                                 .setPartitionData(Collections.singletonList(new ProduceRequestData.PartitionProduceData()
                                         .setIndex(1)
-                                        .setRecords(MemoryRecords.withRecords(CompressionType.NONE, simpleRecord)))))
+                                        .setRecords(MemoryRecords.withRecords(CompressionConfig.none(), simpleRecord)))))
                         .iterator()))
                 .setAcks((short) -1)
                 .setTimeoutMs(10)).build();

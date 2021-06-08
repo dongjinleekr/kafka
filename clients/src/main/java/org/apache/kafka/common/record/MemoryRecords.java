@@ -511,8 +511,8 @@ public class MemoryRecords extends AbstractRecords {
                 buffer.remaining());
     }
 
-    public static MemoryRecords withRecords(CompressionType compressionType, SimpleRecord... records) {
-        return withRecords(RecordBatch.CURRENT_MAGIC_VALUE, CompressionConfig.of(compressionType), records);
+    public static MemoryRecords withRecords(CompressionConfig compressionConfig, SimpleRecord... records) {
+        return withRecords(RecordBatch.CURRENT_MAGIC_VALUE, compressionConfig, records);
     }
 
     public static MemoryRecords withRecords(CompressionType compressionType, int partitionLeaderEpoch, SimpleRecord... records) {

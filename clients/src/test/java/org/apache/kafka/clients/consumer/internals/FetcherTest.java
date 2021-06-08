@@ -2503,7 +2503,7 @@ public class FetcherTest {
                 .setPartitionIndex(tp1.partition())
                 .setHighWatermark(100)
                 .setLogStartOffset(0)
-                .setRecords(MemoryRecords.withRecords(CompressionType.NONE, new SimpleRecord("val".getBytes()))));
+                .setRecords(MemoryRecords.withRecords(CompressionConfig.none(), new SimpleRecord("val".getBytes()))));
 
         client.prepareResponse(FetchResponse.of(Errors.NONE, 0, INVALID_SESSION_ID, new LinkedHashMap<>(partitions), topicIds));
         consumerClient.poll(time.timer(0));
@@ -3126,7 +3126,7 @@ public class FetcherTest {
     public void testUpdatePositionWithLastRecordMissingFromBatch() {
         buildFetcher();
 
-        MemoryRecords records = MemoryRecords.withRecords(CompressionType.NONE,
+        MemoryRecords records = MemoryRecords.withRecords(CompressionConfig.none(),
                 new SimpleRecord("0".getBytes(), "v".getBytes()),
                 new SimpleRecord("1".getBytes(), "v".getBytes()),
                 new SimpleRecord("2".getBytes(), "v".getBytes()),
