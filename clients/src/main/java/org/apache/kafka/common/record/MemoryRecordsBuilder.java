@@ -185,7 +185,7 @@ public class MemoryRecordsBuilder implements AutoCloseable {
         return actualCompressionRatio;
     }
 
-    public CompressionConfig compressionConfing() {
+    public CompressionConfig compressionConfig() {
         return compressionConfig;
     }
 
