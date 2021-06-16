@@ -125,8 +125,8 @@ object ReplicaVerificationTool extends Logging {
 
     CommandLineUtils.checkRequiredArgs(parser, options, effectiveBrokerListOpt)
 
-    val brokerList = options.valueOf(effectiveBrokerListOpt)
-    ToolsUtils.validatePortOrDie(parser, brokerList)
+    val bootstrapServer = options.valueOf(effectiveBrokerListOpt)
+    ToolsUtils.validatePortOrDie(parser, bootstrapServer)
 
     val regex = options.valueOf(topicWhiteListOpt)
 
@@ -149,16 +149,16 @@ object ReplicaVerificationTool extends Logging {
     info("Getting topic metadata...")
 
     val (topicsMetadata, brokerInfo) = {
-      val adminClient = createAdminClient(opts.brokerList)
+      val adminClient = createAdminClient(opts.bootstrapServer)
       try (listTopicsMetadata(adminClient), brokerDetails(adminClient))
       finally CoreUtils.swallow(adminClient.close(), this)
     }
 
     val topicIds = topicsMetadata.map(metadata => metadata.name() -> metadata.topicId()).toMap
 
-    val topicWhiteListFiler = new IncludeList(opts.regex)
+    val topicWhiteListFilter = new IncludeList(opts.regex)
     val filteredTopicMetadata = topicsMetadata.filter { topicMetaData =>
-      topicWhiteListFiler.isTopicAllowed(topicMetaData.name, excludeInternalTopics = false)
+      topicWhiteListFilter.isTopicAllowed(topicMetaData.name, excludeInternalTopics = false)
     }
 
     if (filteredTopicMetadata.isEmpty) {
@@ -189,7 +189,7 @@ object ReplicaVerificationTool extends Logging {
       }
     }
 
-    val consumerProps = consumerConfig(opts.brokerList)
+    val consumerProps = consumerConfig(opts.bootstrapServer)
 
     val replicaBuffer = new ReplicaBuffer(expectedReplicasPerTopicPartition,
       initialOffsets(topicPartitions, consumerProps, opts.initialOffsetTime),
