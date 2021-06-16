@@ -44,7 +44,8 @@ public class CompressionConfig {
         this.type = type;
 
         if (level != null && !type.isValidLevel(level.intValue())) {
-            throw new IllegalArgumentException("Illegal level " + level + " for compression codec " + type.name);
+            throw new IllegalArgumentException(String.format("Illegal level %d for compression codec %s (valid range: [%d, %d])",
+                level, type.name, type.getMinLevel(), type.getMaxLevel()));
         }
 
         this.level = level;

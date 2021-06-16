@@ -49,6 +49,16 @@ public enum CompressionType {
         }
 
         @Override
+        public int getMaxLevel() {
+            return Integer.MAX_VALUE;
+        }
+
+        @Override
+        public int getMinLevel() {
+            return Integer.MIN_VALUE;
+        }
+
+        @Override
         public boolean isValidLevel(int level) {
             return false;
         }
@@ -82,8 +92,13 @@ public enum CompressionType {
         }
 
         @Override
-        public boolean isValidLevel(int level) {
-            return Deflater.BEST_SPEED <= level && level <= Deflater.BEST_COMPRESSION;
+        public int getMaxLevel() {
+            return Deflater.BEST_COMPRESSION;
+        }
+
+        @Override
+        public int getMinLevel() {
+            return Deflater.BEST_SPEED;
         }
     },
 
@@ -102,6 +117,16 @@ public enum CompressionType {
         @Override
         public InputStream wrapForInput(ByteBuffer buffer, byte messageVersion, BufferSupplier decompressionBufferSupplier) {
             return SnappyFactory.wrapForInput(buffer);
+        }
+
+        @Override
+        public int getMaxLevel() {
+            return Integer.MAX_VALUE;
+        }
+
+        @Override
+        public int getMinLevel() {
+            return Integer.MIN_VALUE;
         }
 
         @Override
@@ -131,8 +156,13 @@ public enum CompressionType {
         }
 
         @Override
-        public boolean isValidLevel(int level) {
-            return 1 <= level && level <= 17;
+        public int getMaxLevel() {
+            return 17;
+        }
+
+        @Override
+        public int getMinLevel() {
+            return 1;
         }
     },
 
@@ -148,8 +178,13 @@ public enum CompressionType {
         }
 
         @Override
-        public boolean isValidLevel(int level) {
-            return ZstdFactory.minCompressionLevel() <= level && level <= ZstdFactory.maxCompressionLevel();
+        public int getMaxLevel() {
+            return ZstdFactory.maxCompressionLevel();
+        }
+
+        @Override
+        public int getMinLevel() {
+            return ZstdFactory.minCompressionLevel();
         }
     };
 
@@ -184,7 +219,12 @@ public enum CompressionType {
      */
     public abstract InputStream wrapForInput(ByteBuffer buffer, byte messageVersion, BufferSupplier decompressionBufferSupplier);
 
-    public abstract boolean isValidLevel(int level);
+    public abstract int getMaxLevel();
+    public abstract int getMinLevel();
+
+    public boolean isValidLevel(int level) {
+        return getMinLevel() <= level && level <= getMaxLevel();
+    }
 
     public static CompressionType forId(int id) {
         switch (id) {
