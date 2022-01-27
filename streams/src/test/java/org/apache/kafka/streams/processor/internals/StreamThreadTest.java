@@ -2158,8 +2158,7 @@ public class StreamThreadTest {
             new RecordHeaders(),
             Optional.empty()));
 
-        try (final LogCaptureContext logCaptureContext =
-                 LogCaptureContext.create(this.getClass().getName() + "#shouldLogAndRecordSkippedMetricForDeserializationException")) {
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create()) {
             thread.runOnce();
 
             final List<String> strings = logCaptureContext.getMessages();
@@ -2710,8 +2709,7 @@ public class StreamThreadTest {
             Collections.singletonMap("client-id", thread.getName())
         );
 
-        try (final LogCaptureContext logCaptureContext =
-                 LogCaptureContext.create(this.getClass().getName() + "#shouldLogAndRecordSkippedRecordsForInvalidTimestamps")) {
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create()) {
             long offset = -1;
             addRecord(mockConsumer, ++offset);
             addRecord(mockConsumer, ++offset);

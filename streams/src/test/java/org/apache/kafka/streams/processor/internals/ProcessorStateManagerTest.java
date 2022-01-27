@@ -783,8 +783,7 @@ public class ProcessorStateManagerTest {
         stateMgr.registerStore(persistentStore, persistentStore.stateRestoreCallback);
         stateDirectory.clean();
 
-        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(
-                this.getClass().getName() + "#shouldLogAWarningIfCheckpointThrowsAnIOException")) {
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create()) {
             logCaptureContext.setLatch(4);
 
             stateMgr.updateChangelogOffsets(singletonMap(persistentStorePartition, 10L));

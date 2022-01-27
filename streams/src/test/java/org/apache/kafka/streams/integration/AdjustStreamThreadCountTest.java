@@ -63,7 +63,6 @@ import static org.apache.kafka.streams.integration.utils.IntegrationTestUtils.pu
 import static org.apache.kafka.streams.integration.utils.IntegrationTestUtils.safeUniqueTestName;
 import static org.apache.kafka.test.TestUtils.waitForCondition;
 
-import static org.hamcrest.CoreMatchers.both;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.hasItems;
@@ -379,8 +378,7 @@ public class AdjustStreamThreadCountTest {
         props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2);
         props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, totalCacheBytes);
 
-        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
-            + "#shouldResizeCacheAfterThreadRemovalTimesOut");
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create();
              final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), props)) {
             logCaptureContext.setLatch(20);
 
@@ -404,8 +402,7 @@ public class AdjustStreamThreadCountTest {
         props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2);
         props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, totalCacheBytes);
 
-        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create(this.getClass().getName()
-            + "#shouldResizeCacheAfterThreadReplacement");
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create();
              final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), props)) {
             logCaptureContext.setLatch(20);
 

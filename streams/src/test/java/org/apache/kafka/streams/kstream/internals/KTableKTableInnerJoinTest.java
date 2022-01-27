@@ -261,8 +261,7 @@ public class KTableKTableInnerJoinTest {
         context.setRecordMetadata("left", -1, -2, new RecordHeaders(), -3);
         join.init(context);
 
-        try (final LogCaptureContext logCaptureContext =
-                 LogCaptureContext.create(this.getClass().getName() + "#shouldLogAndMeterSkippedRecordsDueToNullLeftKey")) {
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create()) {
             join.process(null, new Change<>("new", "old"));
 
             assertThat(
