@@ -402,8 +402,7 @@ public class AdjustStreamThreadCountTest {
         props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2);
         props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, totalCacheBytes);
 
-        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create();
-             final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), props)) {
+        try (final LogCaptureContext logCaptureContext = LogCaptureContext.create()) {
             logCaptureContext.setLatch(20);
 
             final AtomicBoolean injectError = new AtomicBoolean(false);
@@ -431,20 +430,22 @@ public class AdjustStreamThreadCountTest {
                 }
             });
 
-            addStreamStateChangeListener(kafkaStreams);
-            kafkaStreams.setUncaughtExceptionHandler(e -> StreamThreadExceptionResponse.REPLACE_THREAD);
-            startStreamsAndWaitForRunning(kafkaStreams);
+            try (final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), props)) {
+                addStreamStateChangeListener(kafkaStreams);
+                kafkaStreams.setUncaughtExceptionHandler(e -> StreamThreadExceptionResponse.REPLACE_THREAD);
+                startStreamsAndWaitForRunning(kafkaStreams);
 
-            stateTransitionHistory.clear();
-            injectError.set(true);
-            waitForCondition(() -> !injectError.get(), "StreamThread did not hit and reset the injected error");
+                stateTransitionHistory.clear();
+                injectError.set(true);
+                waitForCondition(() -> !injectError.get(), "StreamThread did not hit and reset the injected error");
 
-            waitForTransitionFromRebalancingToRunning();
+                waitForTransitionFromRebalancingToRunning();
 
-            logCaptureContext.await();
-            // all 10 bytes should be available for remaining thread
-            assertThat(logCaptureContext.getMessages(),
-                hasItems(containsString("Adding StreamThread-3, there will now be 2 live threads and the new cache size per thread is 5")));
+                logCaptureContext.await();
+                // all 10 bytes should be available for remaining thread
+                assertThat(logCaptureContext.getMessages(),
+                    hasItems(containsString("Adding StreamThread-3, there will now be 2 live threads and the new cache size per thread is 5")));
+            }
         }
     }
 }
